@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import * as Icons from 'lucide-react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, type LucideIcon } from 'lucide-react';
 import { categories } from '@/data/categories';
 
 export function Categories() {
@@ -29,9 +29,8 @@ export function Categories() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           {featured.map((c, i) => {
-            const Icon = (Icons as Record<string, React.ComponentType<{ className?: string }>>)[
-              c.icon
-            ] ?? Icons.Package;
+            const Icon =
+              ((Icons as unknown as Record<string, LucideIcon>)[c.icon] ?? Icons.Package);
             return (
               <motion.div
                 key={c.id}

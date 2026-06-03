@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { categories } from '@/data/categories';
 import type { StockStatus } from '@/types';
 import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface FilterBarProps {
   query: string;
@@ -112,8 +113,7 @@ export function FilterBar(props: FilterBarProps) {
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
             {categories.map((c) => {
               const Icon =
-                (Icons as Record<string, React.ComponentType<{ className?: string }>>)[c.icon] ??
-                Icons.Package;
+                ((Icons as unknown as Record<string, LucideIcon>)[c.icon] ?? Icons.Package);
               const active = category === c.slug;
               return (
                 <button

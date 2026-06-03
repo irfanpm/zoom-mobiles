@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { categories, findCategory } from '@/data/categories';
 import { getProductsByCategory } from '@/data/products';
 import { Button } from '@/components/ui/button';
@@ -36,8 +37,7 @@ export default async function CategoryPage({
 
   const products = getProductsByCategory(cat.slug);
   const Icon =
-    (Icons as Record<string, React.ComponentType<{ className?: string }>>)[cat.icon] ??
-    Icons.Package;
+    ((Icons as unknown as Record<string, LucideIcon>)[cat.icon] ?? Icons.Package);
 
   return (
     <>
