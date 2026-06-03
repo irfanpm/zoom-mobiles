@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 142 76% 36%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 142 76% 45%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 210 40% 98%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'cv11' 1, 'ss01' 1;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-primary-900;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply h-2 w-2;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-100;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-dark-300 hover:bg-dark-400 transition-colors;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-soft;
+  }
+  .glass-dark {
+    @apply bg-dark-900/70 backdrop-blur-xl border border-white/10;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary via-primary-600 to-secondary bg-clip-text text-transparent;
+  }
+  .gradient-text-warm {
+    @apply bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent;
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-premium;
+  }
+  .premium-border {
+    @apply relative before:absolute before:inset-0 before:rounded-[inherit] before:p-px before:bg-gradient-to-br before:from-white/60 before:via-white/10 before:to-transparent before:-z-10;
+  }
+  .shimmer {
+    background: linear-gradient(
+      110deg,
+      rgba(226, 232, 240, 0.6) 8%,
+      rgba(241, 245, 249, 0.9) 18%,
+      rgba(226, 232, 240, 0.6) 33%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+  .container-fluid {
+    @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8;
+  }
+  .section {
+    @apply py-16 sm:py-20 lg:py-28;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium;
+  }
+}
+
+@layer utilities {
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

@@ -1,0 +1,270 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Inbox, Sparkles, Flame } from 'lucide-react';
+import { FilterBar } from '@/components/products/FilterBar';
+import { ProductCard } from '@/components/products/ProductCard';
+import { ProductDetailModal } from '@/components/products/ProductDetailModal';
+import { ProductSkeleton } from '@/components/products/ProductSkeleton';
+import { Button } from '@/components/ui/button';
+import { products as ALL } from '@/data/products';
+import type { Product, StockStatus } from '@/types';
+
+type Sort = 'name' | 'stock-high' | 'stock-low' | 'price-low' | 'price-high';
+
+export default function ProductsPage() {
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<string>('all');
+  const [status, setStatus] = useState<'all' | StockStatus>('all');
+  const [brand, setBrand] = useState('');
+  const [sort, setSort] = useState<Sort>('name');
+  const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState<Product | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const cat = params.get('cat');
+    const filt = params.get('filter');
+    if (cat) setCategory(cat);
+    if (filt === 'new' || filt === 'fast') {
+      // surface relevant items by sort
+      setSort('stock-high');
+    }
+  }, []);
+
+  const brands = useMemo(
+    () => Array.from(new Set(ALL.map((p) => p.brand))).sort(),
+    []
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let list = ALL.filter((p) => {
+      if (category !== 'all' && p.category !== category) return false;
+      if (status !== 'all' && p.status !== status) return false;
+      if (brand && p.brand !== brand) return false;
+      if (!q) return true;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.code.toLowerCase().includes(q) ||
+        p.brand.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q)
+      );
+    });
+
+    list = [...list].sort((a, b) => {
+      switch (sort) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'stock-high':
+          return b.availableQty - a.availableQty;
+        case 'stock-low':
+          return a.availableQty - b.availableQty;
+        case 'price-low':
+          return (a.price ?? 0) - (b.price ?? 0);
+        case 'price-high':
+          return (b.price ?? 0) - (a.price ?? 0);
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [query, category, status, brand, sort]);
+
+  const fastSelling = useMemo(() => ALL.filter((p) => p.isFastSelling).slice(0, 8), []);
+  const newLaunches = useMemo(() => ALL.filter((p) => p.isNew).slice(0, 8), []);
+
+  const handleView = (p: Product) => {
+    setActive(p);
+    setOpen(true);
+  };
+
+  const handleReset = () => {
+    setQuery('');
+    setCategory('all');
+    setStatus('all');
+    setBrand('');
+    setSort('name');
+  };
+
+  return (
+    <>
+      <section className="bg-gradient-to-b from-dark-50 to-white border-b border-dark-200/70">
+        <div className="container-fluid py-10 lg:py-14">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+              <span className="chip bg-primary/10 text-primary-700">Live Inventory</span>
+              <h1 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-dark-900">
+                Wholesale Catalog
+              </h1>
+              <p className="mt-2 text-dark-600 max-w-2xl">
+                Real-time stock across {ALL.length}+ premium products. Add to enquiry or order
+                directly on WhatsApp — pricing reserved for verified resellers.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-xs sm:text-sm">
+              <Stat label="Total SKUs" value={`${ALL.length}+`} accent="text-dark-900" />
+              <Stat
+                label="In Stock"
+                value={ALL.filter((p) => p.status === 'in-stock').length}
+                accent="text-primary"
+              />
+              <Stat
+                label="Low Stock"
+                value={ALL.filter((p) => p.status === 'low-stock').length}
+                accent="text-warning"
+              />
+              <Stat
+                label="Out of Stock"
+                value={ALL.filter((p) => p.status === 'out-of-stock').length}
+                accent="text-danger"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <FilterBar
+        query={query}
+        onQuery={setQuery}
+        category={category}
+        onCategory={setCategory}
+        status={status}
+        onStatus={setStatus}
+        brand={brand}
+        onBrand={setBrand}
+        brands={brands}
+        sort={sort}
+        onSort={setSort}
+        total={ALL.length}
+        filtered={filtered.length}
+        onReset={handleReset}
+      />
+
+      <section className="container-fluid py-8">
+        {category === 'all' && !query && status === 'all' && !brand && (
+          <>
+            <Strip
+              title="Fast Selling"
+              icon={Flame}
+              accent="bg-accent text-accent-foreground"
+              products={fastSelling}
+              onView={handleView}
+            />
+            <Strip
+              title="New Launches"
+              icon={Sparkles}
+              accent="bg-secondary text-white"
+              products={newLaunches}
+              onView={handleView}
+            />
+            <div className="flex items-center gap-2 mt-12 mb-4">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              <h2 className="text-xl font-bold text-dark-900">All Products</h2>
+              <span className="text-sm text-dark-500">· {filtered.length}</span>
+            </div>
+          </>
+        )}
+
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <ProductSkeleton key={i} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState onReset={handleReset} />
+        ) : (
+          <motion.div
+            layout
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+          >
+            <AnimatePresence mode="popLayout">
+              {filtered.map((p) => (
+                <ProductCard key={p.id} product={p} onView={handleView} />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </section>
+
+      <ProductDetailModal product={active} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number | string;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dark-200 bg-white px-4 py-3">
+      <div className={`text-2xl font-extrabold leading-none ${accent}`}>{value}</div>
+      <div className="text-xs text-dark-500 mt-1">{label}</div>
+    </div>
+  );
+}
+
+function Strip({
+  title,
+  icon: Icon,
+  accent,
+  products,
+  onView,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  products: Product[];
+  onView: (p: Product) => void;
+}) {
+  if (!products.length) return null;
+  return (
+    <div className="mb-12">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className={`h-7 w-7 rounded-lg ${accent} inline-flex items-center justify-center`}>
+            <Icon className="h-4 w-4" />
+          </span>
+          <h2 className="text-xl font-bold text-dark-900">{title}</h2>
+          <span className="text-sm text-dark-500">· {products.length}</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} onView={onView} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ onReset }: { onReset: () => void }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-dark-300 bg-white p-16 text-center">
+      <div className="mx-auto h-16 w-16 rounded-2xl bg-dark-100 flex items-center justify-center">
+        <Inbox className="h-8 w-8 text-dark-400" />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-dark-900">No products match</h3>
+      <p className="mt-1 text-sm text-dark-500 max-w-sm mx-auto">
+        Try clearing some filters or searching for a different product or brand.
+      </p>
+      <Button className="mt-6" onClick={onReset}>
+        Reset filters
+      </Button>
+    </div>
+  );
+}
