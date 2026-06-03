@@ -11,8 +11,13 @@ export function generateStaticParams() {
   return categories.filter((c) => c.slug !== 'all').map((c) => ({ slug: c.slug }));
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }) {
-  const cat = findCategory(params.slug);
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const cat = findCategory(slug);
   if (!cat) return { title: 'Category' };
   return {
     title: `${cat.name} — Wholesale Catalog`,
@@ -20,8 +25,13 @@ export function generateMetadata({ params }: { params: { slug: string } }) {
   };
 }
 
-export default function CategoryPage({ params }: { params: { slug: string } }) {
-  const cat = findCategory(params.slug);
+export default async function CategoryPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const cat = findCategory(slug);
   if (!cat || cat.slug === 'all') notFound();
 
   const products = getProductsByCategory(cat.slug);
