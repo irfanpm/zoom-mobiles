@@ -5,10 +5,10 @@ export const siteConfig = {
   description:
     "India's Largest Mobile Accessories Wholesale Hub — real-time stock, instant WhatsApp ordering and 5000+ products.",
   url: 'https://zoommobiles.in',
-  whatsappNumber: '919999999999',
-  whatsappDisplay: '+91 99999 99999',
+  whatsappNumber: '919207908718',
+  whatsappDisplay: '+91 92079 08718',
   email: 'sales@zoommobiles.in',
-  phone: '+91 99999 99999',
+  phone: '+91 92079 08718',
   address: 'Mumbai, Maharashtra, India',
   social: {
     instagram: 'https://instagram.com/zoommobiles',
