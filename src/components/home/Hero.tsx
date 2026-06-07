@@ -16,8 +16,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { siteConfig } from '@/lib/config';
+import { useSettings } from '@/components/providers/SettingsProvider';
 
 export function Hero() {
+  const settings = useSettings();
   return (
     <section className="relative overflow-hidden pt-12 lg:pt-20 pb-20">
       <div className="absolute inset-0 bg-mesh-primary opacity-70" aria-hidden />
@@ -75,7 +77,7 @@ export function Hero() {
               </Button>
               <Button asChild size="xl" variant="whatsapp" className="w-full sm:w-auto">
                 <a
-                  href={`https://wa.me/${siteConfig.whatsappNumber}`}
+                  href={`https://wa.me/${settings.whatsapp_number.replace(/\D/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

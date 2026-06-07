@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, MessageCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { siteConfig } from '@/lib/config';
+import { useSettings } from '@/components/providers/SettingsProvider';
 
 export function CTA() {
+  const settings = useSettings();
   return (
     <section className="section">
       <div className="container-fluid">
@@ -50,7 +51,7 @@ export function CTA() {
               </Button>
               <Button asChild size="xl" variant="whatsapp">
                 <a
-                  href={`https://wa.me/${siteConfig.whatsappNumber}`}
+                  href={`https://wa.me/${settings.whatsapp_number.replace(/\D/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

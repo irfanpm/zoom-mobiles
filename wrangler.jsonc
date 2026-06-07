@@ -1,0 +1,37 @@
+/**
+ * Cloudflare Workers / Pages deployment config for Zoom Mobiles.
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "zoom-mobiles",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": [
+    "nodejs_compat" // lets Node-style modules (Supabase, etc.) run on Workers
+  ],
+
+  // OpenNext writes the build output here
+  "main": ".open-next/worker.js",
+
+  // Serve static assets (Next.js `_next/static`, public/) from KV
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // Map the worker observability/logging
+  "observability": {
+    "enabled": true
+  }
+
+  // ── ENV VARS ──────────────────────────────────────────────────
+  // Set these in the Cloudflare dashboard for production:
+  //   Workers & Pages → your worker → Settings → Variables
+  //
+  //   NEXT_PUBLIC_SUPABASE_URL        =  https://YOUR-REF.supabase.co
+  //   NEXT_PUBLIC_SUPABASE_ANON_KEY   =  sb_publishable_...
+  //   SUPABASE_SERVICE_ROLE_KEY       =  sb_secret_...       (mark as Secret)
+  //   NEXT_PUBLIC_SITE_URL            =  https://zoom-mobiles.YOUR-DOMAIN.workers.dev
+  //
+  // For LOCAL preview, create a `.dev.vars` file (gitignored — see .gitignore).
+}

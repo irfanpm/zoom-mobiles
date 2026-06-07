@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { ArrowRight, ShieldCheck, Truck, Headphones, Award, Users, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { siteConfig } from '@/lib/config';
+import { fetchSettings } from '@/lib/catalog';
+
+export const dynamic = 'force-dynamic';
 
 const PILLARS = [
   { icon: ShieldCheck, title: 'Verified Wholesaler', text: '15+ years of trust in the wholesale electronics trade.' },
@@ -12,13 +14,14 @@ const PILLARS = [
   { icon: Building2, title: 'Bulk Pricing', text: 'Box, inner & MOQ wholesale pricing — built for retailers.' },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const settings = await fetchSettings();
   return (
     <>
       <section className="bg-gradient-to-b from-primary/5 to-white border-b border-dark-200/70">
         <div className="container-fluid py-16 lg:py-24">
           <div className="max-w-3xl">
-            <span className="chip bg-primary/10 text-primary-700">About {siteConfig.name}</span>
+            <span className="chip bg-primary/10 text-primary-700">About {settings.company_name}</span>
             <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-dark-900 text-balance">
               India&apos;s most trusted mobile accessories wholesale platform.
             </h1>

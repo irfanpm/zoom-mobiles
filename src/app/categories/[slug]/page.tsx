@@ -3,14 +3,14 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { categories, findCategory } from '@/data/categories';
-import { getProductsByCategory } from '@/data/products';
 import { Button } from '@/components/ui/button';
 import { CategoryProductGrid } from '@/components/products/CategoryProductGrid';
+import { fetchCategoryBySlug, fetchProductsByCategory } from '@/lib/catalog';
+import { toUIProduct } from '@/lib/data-mapper';
 
-export function generateStaticParams() {
-  return categories.filter((c) => c.slug !== 'all').map((c) => ({ slug: c.slug }));
-}
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export async function generateMetadata({
   params,
@@ -18,11 +18,11 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const cat = findCategory(slug);
+  const cat = await fetchCategoryBySlug(slug);
   if (!cat) return { title: 'Category' };
   return {
     title: `${cat.name} — Wholesale Catalog`,
-    description: cat.description,
+    description: cat.description ?? undefined,
   };
 }
 
@@ -32,16 +32,17 @@ export default async function CategoryPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const cat = findCategory(slug);
-  if (!cat || cat.slug === 'all') notFound();
+  const cat = await fetchCategoryBySlug(slug);
+  if (!cat) notFound();
 
-  const products = getProductsByCategory(cat.slug);
+  const publicProducts = await fetchProductsByCategory(cat.slug);
+  const products = publicProducts.map(toUIProduct);
   const Icon =
-    ((Icons as unknown as Record<string, LucideIcon>)[cat.icon] ?? Icons.Package);
+    ((Icons as unknown as Record<string, LucideIcon>)[cat.icon ?? 'Package'] ?? Icons.Package);
 
   return (
     <>
-      <section className={`relative overflow-hidden bg-gradient-to-br ${cat.color}`}>
+      <section className="relative overflow-hidden bg-gradient-to-br from-dark-900 via-secondary-900 to-primary-700">
         <div className="absolute inset-0 bg-grid-slate [background-size:32px_32px] opacity-10" aria-hidden />
         <div className="container-fluid py-16 lg:py-20 text-white relative">
           <Link
@@ -58,10 +59,11 @@ export default async function CategoryPage({
               <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
                 {cat.name}
               </h1>
-              <p className="mt-2 text-white/80 max-w-2xl">{cat.description}</p>
+              {cat.description && (
+                <p className="mt-2 text-white/80 max-w-2xl">{cat.description}</p>
+              )}
               <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
                 <span className="chip bg-white/15 text-white">{products.length} live SKUs</span>
-                <span className="chip bg-white/15 text-white">{cat.count}+ total products</span>
                 <span className="chip bg-white text-dark-900">Wholesale</span>
               </div>
             </div>

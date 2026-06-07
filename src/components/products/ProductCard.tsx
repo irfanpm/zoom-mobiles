@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Plus, Sparkles, Flame, Eye, Minus } from 'lucide-react';
+import { Heart, MessageCircle, Plus, Sparkles, Flame, Eye, Minus, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StockBadge, StockDot } from './StockBadge';
 import { cn, formatINR } from '@/lib/utils';
 import { useEnquiryStore } from '@/store/enquiry-store';
 import { quickEnquiryUrl } from '@/lib/whatsapp';
+import { useSettings } from '@/components/providers/SettingsProvider';
+import { logEnquiry } from '@/lib/enquiries/actions';
 import { toast } from 'sonner';
 import type { Product } from '@/types';
 
@@ -23,12 +25,54 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
   const [qty, setQty] = useState(1);
   const addItem = useEnquiryStore((s) => s.addItem);
   const items = useEnquiryStore((s) => s.items);
+  const settings = useSettings();
+  const [waPending, startWa] = useTransition();
+
+  const handleQuickWhatsApp = () => {
+    const url = quickEnquiryUrl(product.name, product.code, settings);
+
+    // Open WhatsApp synchronously (avoids popup blocker)
+    const popup = window.open(url, '_blank', 'noopener');
+    if (!popup) {
+      toast.error('Pop-up blocked — please allow popups for this site');
+      return;
+    }
+
+    // Log to admin panel in background
+    startWa(async () => {
+      const res = await logEnquiry([
+        {
+          product_id: product.id,
+          code: product.code,
+          name: product.name,
+          qty: qty || 1,
+          unit: unit === 'piece' ? 'pcs' : 'box',
+        },
+      ]).catch((e) => ({ error: String(e) }));
+
+      if (res && 'error' in res && res.error) {
+        toast.error('Enquiry not saved to admin', { description: res.error });
+      } else if (res && 'skipped' in res && res.skipped) {
+        // admin testing — silent
+      } else {
+        toast.success('Sent on WhatsApp & logged');
+      }
+    });
+  };
   const inEnquiry = useMemo(() => items.some((i) => i.productId === product.id), [items, product.id]);
 
-  const disabled = product.status === 'out-of-stock';
+  const outOfStock = product.status === 'out-of-stock';
+  const enquiryLocked = product.canEnquire === false;
+  const disabled = outOfStock || enquiryLocked;
 
   const handleAdd = () => {
-    if (disabled) {
+    if (enquiryLocked) {
+      toast.error('Enquiry not available for this brand', {
+        description: 'Contact Zoom Mobiles to request access.',
+      });
+      return;
+    }
+    if (outOfStock) {
       toast.error('Out of stock — add to enquiry instead', {
         description: 'We will notify when this product is back in stock.',
       });
@@ -41,8 +85,11 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
   };
 
   const unitValue =
-    unit === 'box' ? product.box : unit === 'inner' ? product.inner : 1;
+    unit === 'box' ? (product.box ?? 1) : unit === 'inner' ? (product.inner ?? 1) : 1;
   const totalPcs = qty * unitValue;
+  const showBoxInfo = product.box !== null;
+  const showStock = product.availableQty !== null;
+  const showMOQ = product.moq !== null;
 
   return (
     <motion.div
@@ -58,8 +105,13 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
           : 'border-dark-200/70 hover:shadow-premium hover:border-primary/30'
       )}
     >
-      {(product.isNew || product.isFastSelling) && (
+      {(product.isNew || product.isFastSelling || enquiryLocked) && (
         <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
+          {enquiryLocked && (
+            <span className="chip bg-danger/90 text-white shadow-soft backdrop-blur">
+              <Lock className="h-3 w-3" /> Enquiry locked
+            </span>
+          )}
           {product.isNew && (
             <span className="chip bg-secondary text-white shadow-glow-blue">
               <Sparkles className="h-3 w-3" /> New
@@ -88,23 +140,35 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
       <div className={cn('relative overflow-hidden bg-gradient-to-br from-dark-50 to-dark-100',
         variant === 'compact' ? 'h-32' : 'h-44'
       )}>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center px-4">
-            <div className="font-display font-extrabold text-2xl text-dark-800/30 tracking-tight">
-              {product.code}
-            </div>
-            <div className="text-[10px] text-dark-400 mt-1 uppercase tracking-widest">
-              {product.brand}
+        {product.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center px-4">
+              <div className="font-display font-extrabold text-2xl text-dark-800/30 tracking-tight">
+                {product.code}
+              </div>
+              <div className="text-[10px] text-dark-400 mt-1 uppercase tracking-widest">
+                {product.brand}
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="absolute bottom-2 left-2">
           <StockBadge status={product.status} />
         </div>
-        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 chip bg-white/85 backdrop-blur border border-dark-200/60 text-dark-700">
-          <StockDot status={product.status} />
-          {product.availableQty.toLocaleString('en-IN')} pcs
-        </div>
+        {showStock && (
+          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 chip bg-white/85 backdrop-blur border border-dark-200/60 text-dark-700">
+            <StockDot status={product.status} />
+            {product.availableQty!.toLocaleString('en-IN')} pcs
+          </div>
+        )}
       </div>
 
       <div className="p-4 flex flex-col flex-1">
@@ -114,10 +178,11 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
               {product.name}
             </h3>
             <p className="text-xs text-dark-500 mt-0.5">
-              {product.brand} · MOQ {product.moq}
+              {product.brand}
+              {showMOQ && <> · MOQ {product.moq}</>}
             </p>
           </div>
-          {product.price !== undefined && (
+          {product.price != null && (
             <div className="text-right shrink-0">
               <div className="text-base font-bold text-dark-900 leading-none">
                 {formatINR(product.price)}
@@ -127,10 +192,14 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
           )}
         </div>
 
-        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-dark-600">
-          <span className="chip bg-dark-100 text-dark-700">Box: {product.box}</span>
-          <span className="chip bg-dark-100 text-dark-700">Inner: {product.inner}</span>
-        </div>
+        {showBoxInfo && (
+          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-dark-600">
+            <span className="chip bg-dark-100 text-dark-700">Box: {product.box}</span>
+            {product.inner != null && (
+              <span className="chip bg-dark-100 text-dark-700">Inner: {product.inner}</span>
+            )}
+          </div>
+        )}
 
         <div className="mt-3 flex items-center gap-1 rounded-xl border border-dark-200 bg-dark-50 p-1 text-xs">
           {(['box', 'inner', 'piece'] as const).map((u) => (
@@ -196,17 +265,19 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
             type="button"
             variant="whatsapp"
             size="sm"
-            asChild
             className="col-span-1"
+            onClick={handleQuickWhatsApp}
+            disabled={waPending || enquiryLocked}
+            aria-label={enquiryLocked ? 'Enquiry restricted' : 'Order on WhatsApp'}
+            title={enquiryLocked ? 'Brand restricted — contact admin' : 'Order on WhatsApp'}
           >
-            <a
-              href={quickEnquiryUrl(product.name, product.code)}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Order on WhatsApp"
-            >
+            {enquiryLocked ? (
+              <Lock className="h-4 w-4" />
+            ) : waPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
               <MessageCircle className="h-4 w-4" />
-            </a>
+            )}
           </Button>
           <Button
             type="button"
@@ -215,8 +286,15 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
             onClick={handleAdd}
             disabled={disabled}
             variant={inEnquiry ? 'secondary' : 'default'}
+            title={enquiryLocked ? 'Brand restricted — contact admin' : ''}
           >
-            {inEnquiry ? 'Added' : 'Add'}
+            {enquiryLocked ? (
+              <><Lock className="h-3.5 w-3.5" /> Restricted</>
+            ) : inEnquiry ? (
+              'Added'
+            ) : (
+              'Add'
+            )}
           </Button>
         </div>
       </div>

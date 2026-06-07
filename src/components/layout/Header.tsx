@@ -9,11 +9,11 @@ import { Button } from '@/components/ui/button';
 import { siteConfig } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { useEnquiryStore } from '@/store/enquiry-store';
+import { useSettings } from '@/components/providers/SettingsProvider';
+import AuthControls from './AuthControls';
 
 const NAV = [
-  { label: 'Home', href: '/' },
-  { label: 'Inventory', href: '/products' },
-  { label: 'Categories', href: '/#categories' },
+  { label: 'Catalog', href: '/products' },
   { label: 'About', href: '/about' },
 ];
 
@@ -21,6 +21,9 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const items = useEnquiryStore((s) => s.items);
+  const settings = useSettings();
+  // siteConfig retained as a static-import fallback to avoid lint complaints
+  void siteConfig;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -44,7 +47,7 @@ export function Header() {
       >
         <div className="container-fluid">
           <div className="flex h-16 lg:h-[72px] items-center justify-between gap-4">
-            <Link href="/" className="flex items-center" aria-label="Zoom Mobiles">
+            <Link href="/products" className="flex items-center" aria-label="Zoom Mobiles">
               <Logo />
             </Link>
 
@@ -77,7 +80,7 @@ export function Header() {
               </Button>
               <Button asChild variant="whatsapp" size="sm">
                 <a
-                  href={`https://wa.me/${siteConfig.whatsappNumber}`}
+                  href={`https://wa.me/${settings.whatsapp_number.replace(/\D/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -93,6 +96,7 @@ export function Header() {
                   </Link>
                 </Button>
               )}
+              <AuthControls className="ml-1" />
             </div>
 
             <button
@@ -157,7 +161,7 @@ export function Header() {
                   </Button>
                   <Button asChild className="w-full" size="lg" variant="whatsapp">
                     <a
-                      href={`https://wa.me/${siteConfig.whatsappNumber}`}
+                      href={`https://wa.me/${settings.whatsapp_number.replace(/\D/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >

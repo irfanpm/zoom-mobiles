@@ -8,16 +8,23 @@ export interface Product {
   brand: string;
   description: string;
   image?: string;
-  box: number;
-  inner: number;
-  availableQty: number;
-  moq: number;
-  price?: number;
+  /** pcs per box — null if admin hid */
+  box: number | null;
+  /** inner pack qty */
+  inner: number | null;
+  /** available stock — null if admin hid */
+  availableQty: number | null;
+  /** minimum order qty — null if admin hid */
+  moq: number | null;
+  /** wholesale price — null/undefined if admin hid */
+  price?: number | null;
   status: StockStatus;
   tags?: string[];
   isNew?: boolean;
   isFastSelling?: boolean;
   rating?: number;
+  /** False when admin has restricted enquiry for this product's brand for the current customer. */
+  canEnquire?: boolean;
 }
 
 export interface Category {

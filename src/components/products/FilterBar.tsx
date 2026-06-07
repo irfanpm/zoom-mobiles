@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { categories } from '@/data/categories';
+import { categories as STATIC_CATEGORIES } from '@/data/categories';
 import type { StockStatus } from '@/types';
 import * as Icons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -24,6 +24,7 @@ interface FilterBarProps {
   total: number;
   filtered: number;
   onReset: () => void;
+  categories?: { slug: string; name: string; icon?: string }[];
 }
 
 export function FilterBar(props: FilterBarProps) {
@@ -42,7 +43,14 @@ export function FilterBar(props: FilterBarProps) {
     total,
     filtered,
     onReset,
+    categories: dbCategories,
   } = props;
+
+  // Prefer live DB categories, fall back to static seed
+  const cats =
+    dbCategories && dbCategories.length > 0
+      ? [{ slug: 'all', name: 'All', icon: 'LayoutGrid' }, ...dbCategories]
+      : STATIC_CATEGORIES;
 
   return (
     <div className="sticky top-16 lg:top-[72px] z-30 bg-white/85 backdrop-blur-xl border-b border-dark-200/70">
@@ -111,13 +119,13 @@ export function FilterBar(props: FilterBarProps) {
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
-            {categories.map((c) => {
+            {cats.map((c) => {
               const Icon =
-                ((Icons as unknown as Record<string, LucideIcon>)[c.icon] ?? Icons.Package);
+                ((Icons as unknown as Record<string, LucideIcon>)[c.icon ?? 'Package'] ?? Icons.Package);
               const active = category === c.slug;
               return (
                 <button
-                  key={c.id}
+                  key={c.slug}
                   type="button"
                   onClick={() => onCategory(c.slug)}
                   className={cn(
@@ -129,14 +137,6 @@ export function FilterBar(props: FilterBarProps) {
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {c.name}
-                  <span
-                    className={cn(
-                      'rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-                      active ? 'bg-white/15 text-white' : 'bg-dark-100 text-dark-600'
-                    )}
-                  >
-                    {c.count}
-                  </span>
                 </button>
               );
             })}

@@ -1,30 +1,36 @@
+'use client';
+
 import Link from 'next/link';
 import { Mail, Phone, MapPin, Instagram, Facebook, Youtube, MessageCircle } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { siteConfig } from '@/lib/config';
-
-const FOOTER_LINKS = {
-  Company: [
-    { label: 'About Us', href: '/about' },
-    { label: 'Contact', href: '/#contact' },
-    { label: 'Become a Reseller', href: '#' },
-    { label: 'Brand Partners', href: '#' },
-  ],
-  Catalog: [
-    { label: 'All Products', href: '/products' },
-    { label: 'New Launches', href: '/products?filter=new' },
-    { label: 'Fast Selling', href: '/products?filter=fast' },
-    { label: 'Out of Stock', href: '/products?status=out-of-stock' },
-  ],
-  Support: [
-    { label: 'WhatsApp Order', href: `https://wa.me/${siteConfig.whatsappNumber}` },
-    { label: 'Wholesale Pricing', href: '#' },
-    { label: 'Bulk Ordering', href: '#' },
-    { label: 'Returns Policy', href: '#' },
-  ],
-};
+import { useSettings } from '@/components/providers/SettingsProvider';
 
 export function Footer() {
+  const settings = useSettings();
+  const waNumber = settings.whatsapp_number.replace(/\D/g, '');
+
+  const FOOTER_LINKS = {
+    Company: [
+      { label: 'About Us', href: '/about' },
+      { label: 'Contact', href: '/#contact' },
+      { label: 'Become a Reseller', href: '#' },
+      { label: 'Brand Partners', href: '#' },
+    ],
+    Catalog: [
+      { label: 'All Products', href: '/products' },
+      { label: 'New Launches', href: '/products?filter=new' },
+      { label: 'Fast Selling', href: '/products?filter=fast' },
+      { label: 'Out of Stock', href: '/products?status=out-of-stock' },
+    ],
+    Support: [
+      { label: 'WhatsApp Order', href: `https://wa.me/${waNumber}` },
+      { label: 'Wholesale Pricing', href: '#' },
+      { label: 'Bulk Ordering', href: '#' },
+      { label: 'Returns Policy', href: '#' },
+    ],
+  };
+
   return (
     <footer className="bg-dark-900 text-dark-200 mt-24">
       <div className="container-fluid py-16">
@@ -36,30 +42,36 @@ export function Footer() {
             </p>
             <div className="mt-6 space-y-2 text-sm">
               <a
-                href={`https://wa.me/${siteConfig.whatsappNumber}`}
+                href={`https://wa.me/${waNumber}`}
                 className="flex items-center gap-2 text-dark-300 hover:text-primary transition-colors"
               >
                 <MessageCircle className="h-4 w-4 text-primary" />
-                {siteConfig.whatsappDisplay}
+                {settings.whatsapp_display}
               </a>
-              <a
-                href={`tel:${siteConfig.phone}`}
-                className="flex items-center gap-2 text-dark-300 hover:text-white"
-              >
-                <Phone className="h-4 w-4" />
-                {siteConfig.phone}
-              </a>
-              <a
-                href={`mailto:${siteConfig.email}`}
-                className="flex items-center gap-2 text-dark-300 hover:text-white"
-              >
-                <Mail className="h-4 w-4" />
-                {siteConfig.email}
-              </a>
-              <div className="flex items-center gap-2 text-dark-300">
-                <MapPin className="h-4 w-4" />
-                {siteConfig.address}
-              </div>
+              {settings.phone && (
+                <a
+                  href={`tel:${settings.phone}`}
+                  className="flex items-center gap-2 text-dark-300 hover:text-white"
+                >
+                  <Phone className="h-4 w-4" />
+                  {settings.phone}
+                </a>
+              )}
+              {settings.email && (
+                <a
+                  href={`mailto:${settings.email}`}
+                  className="flex items-center gap-2 text-dark-300 hover:text-white"
+                >
+                  <Mail className="h-4 w-4" />
+                  {settings.email}
+                </a>
+              )}
+              {settings.address && (
+                <div className="flex items-center gap-2 text-dark-300">
+                  <MapPin className="h-4 w-4" />
+                  {settings.address}
+                </div>
+              )}
             </div>
             <div className="mt-6 flex items-center gap-3">
               <SocialIcon href={siteConfig.social.instagram} label="Instagram">
@@ -99,18 +111,12 @@ export function Footer() {
 
         <div className="mt-14 pt-8 border-t border-dark-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <p className="text-xs text-dark-500">
-            © {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+            © {new Date().getFullYear()} {settings.company_name}. All rights reserved.
           </p>
           <div className="flex items-center gap-5 text-xs text-dark-500">
-            <Link href="#" className="hover:text-dark-200">
-              Privacy
-            </Link>
-            <Link href="#" className="hover:text-dark-200">
-              Terms
-            </Link>
-            <Link href="#" className="hover:text-dark-200">
-              Cookies
-            </Link>
+            <Link href="#" className="hover:text-dark-200">Privacy</Link>
+            <Link href="#" className="hover:text-dark-200">Terms</Link>
+            <Link href="#" className="hover:text-dark-200">Cookies</Link>
           </div>
         </div>
       </div>

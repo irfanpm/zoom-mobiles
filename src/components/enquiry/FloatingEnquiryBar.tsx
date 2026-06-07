@@ -1,13 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, ShoppingBag, X, ChevronUp, Trash2 } from 'lucide-react';
+import { MessageCircle, ShoppingBag, X, ChevronUp, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEnquiryStore } from '@/store/enquiry-store';
-import { buildWhatsAppMessage, buildWhatsAppUrl } from '@/lib/whatsapp';
+import { buildWhatsAppMessage } from '@/lib/whatsapp';
+import { useSettings, whatsappUrl } from '@/components/providers/SettingsProvider';
 import { cn } from '@/lib/utils';
+import { logEnquiry } from '@/lib/enquiries/actions';
+import { toast } from 'sonner';
+import type { DbEnquiryItem } from '@/lib/supabase/types';
 
 export function FloatingEnquiryBar() {
   const [mounted, setMounted] = useState(false);
@@ -15,6 +19,8 @@ export function FloatingEnquiryBar() {
   const items = useEnquiryStore((s) => s.items);
   const clear = useEnquiryStore((s) => s.clear);
   const removeItem = useEnquiryStore((s) => s.removeItem);
+  const settings = useSettings();
+  const [pending, start] = useTransition();
 
   useEffect(() => {
     setMounted(true);
@@ -26,8 +32,52 @@ export function FloatingEnquiryBar() {
 
   const handleSend = () => {
     if (items.length === 0) return;
-    const msg = buildWhatsAppMessage({ items });
-    window.open(buildWhatsAppUrl(msg), '_blank', 'noopener');
+
+    // Map UI items → DB shape
+    const dbItems: DbEnquiryItem[] = items.map((it) => ({
+      product_id: it.productId,
+      code: it.code,
+      name: it.name,
+      qty: it.quantity,
+      unit: it.unit === 'piece' ? 'pcs' : 'box',
+    }));
+
+    const msg = buildWhatsAppMessage({ items, settings });
+    const url = whatsappUrl(settings.whatsapp_number, msg);
+
+    // ── Open WhatsApp SYNCHRONOUSLY inside the user-click handler ──
+    // Browsers block window.open() that fires later inside an async callback.
+    // Doing it now (directly in the click) bypasses the popup blocker.
+    const popup = window.open(url, '_blank', 'noopener');
+    if (!popup) {
+      toast.error('Pop-up blocked', {
+        description: `Please allow popups, or open ${settings.whatsapp_display} manually.`,
+      });
+      return;
+    }
+
+    // ── Log to DB in background (won't block the customer) ──
+    start(async () => {
+      const res = await logEnquiry(dbItems);
+      if (!res) {
+        toast.error('Unknown error logging enquiry');
+        return;
+      }
+      if ('error' in res && res.error) {
+        toast.error('Enquiry not saved to admin', { description: res.error });
+        return;
+      }
+      if ('skipped' in res && res.skipped) {
+        toast.warning('WhatsApp opened, but enquiry NOT logged', {
+          description:
+            'You are logged in as admin — enquiry logging requires a customer account.',
+          duration: 6000,
+        });
+        return;
+      }
+      toast.success('✅ Enquiry sent & saved to admin panel');
+      clear(); // empty the cart so user sees a clean slate
+    });
   };
 
   return (
@@ -55,8 +105,13 @@ export function FloatingEnquiryBar() {
                         key={item.productId}
                         className="flex items-center gap-3 rounded-xl bg-white/5 p-3"
                       >
-                        <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white/80 text-xs shrink-0">
-                          {item.code.slice(0, 4)}
+                        <div className="h-10 w-10 rounded-lg bg-white/10 overflow-hidden shrink-0 grid place-items-center">
+                          {item.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="font-bold text-white/80 text-xs">{item.code.slice(0, 4)}</span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-sm truncate">{item.name}</div>
@@ -129,10 +184,17 @@ export function FloatingEnquiryBar() {
                   size="lg"
                   variant="whatsapp"
                   onClick={handleSend}
+                  disabled={pending}
                 >
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Send on WhatsApp</span>
-                  <span className="sm:hidden">Send</span>
+                  {pending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {pending ? 'Sending…' : 'Send on WhatsApp'}
+                  </span>
+                  <span className="sm:hidden">{pending ? '…' : 'Send'}</span>
                 </Button>
               </div>
             </div>

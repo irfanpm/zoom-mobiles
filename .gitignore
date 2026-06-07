@@ -9,3 +9,11 @@ out
 next-env.d.ts
 .idea
 .vscode
+
+# OpenNext / Cloudflare build artifacts
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
+
+# Wrangler local secrets
+.dev.vars
