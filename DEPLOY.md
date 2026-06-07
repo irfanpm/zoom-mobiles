@@ -198,17 +198,29 @@ Redeploy: `npm run cf:deploy` (or push to GitHub for auto-deploy — see Step 8)
 
 Connect Cloudflare to GitHub so every `git push` triggers a deploy.
 
-1. Cloudflare dashboard → **Workers & Pages** → **Create**
-2. **Pages → Connect to Git** → authorize GitHub → pick `zoom-mobiles` repo
-3. **Build settings**:
-   - **Framework preset**: None (custom)
-   - **Build command**: `npm run cf:build`
-   - **Build output directory**: `.open-next`
-   - **Root directory**: `/`
-4. **Environment variables**: same as STEP 4
-5. **Save and Deploy**
+> ⚠️ **CRITICAL — use "Workers Build" (NOT "Pages → Connect to Git").**
+> Pages will fail with `Pages only supports files up to 25 MiB` because it tries to upload the `.next/cache` folder as static assets. Workers Build is the correct flow for OpenNext.
 
-After this, every `git push` → Cloudflare detects → builds → deploys in ~3 minutes.
+### Correct path
+
+1. Cloudflare dashboard → **Workers & Pages** → click **Create**
+2. Look for the **"Import a Repository"** tile (under the Workers section, not Pages)
+   - In the newer UI: **Workers** tab → **Create Worker** → **"Connect to Git"**
+   - ❌ DO NOT click "Pages → Connect to Git" — that's a different product
+3. Authorize GitHub → select `zoom-mobiles` repo
+4. **Build configuration:**
+   - **Framework preset**: `None` (or `Other`)
+   - **Build command**: `npm run cf:build`
+   - **Deploy command**: `npx wrangler deploy`
+   - **Root directory**: `/` (leave blank)
+   - **DO NOT** set "Build output directory" — Workers uses the deploy command, not a static directory
+5. **Environment variables**: same as STEP 4 (4 vars)
+6. Click **Create and deploy**
+
+After this, every `git push` → Workers Build detects → runs `cf:build` → deploys via `wrangler deploy` in ~3 minutes.
+
+### If you see "Pages only supports files up to 25 MiB"
+You accidentally picked the Pages flow. Delete the project and start over with the Workers Build flow above.
 
 ---
 

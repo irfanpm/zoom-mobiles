@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
 import { headers } from 'next/headers';
 import { Toaster } from 'sonner';
 import { Header } from '@/components/layout/Header';
@@ -10,11 +9,9 @@ import { fetchSettings } from '@/lib/catalog';
 import { siteConfig } from '@/lib/config';
 import './globals.css';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+// System font stack — no network needed at build time. Matches Inter's look
+// (Apple uses SF, Windows uses Segoe UI, modern browsers fall back to system-ui).
+// To self-host Inter later, install @next/font + place .woff2 in /public/fonts.
 
 export const metadata: Metadata = {
   title: {
@@ -89,7 +86,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     pathname === '/login';
 
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-dvh bg-background flex flex-col" suppressHydrationWarning>
         <SettingsProvider value={settings}>
           {isBareRoute ? (
