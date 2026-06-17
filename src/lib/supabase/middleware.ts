@@ -42,9 +42,19 @@ export async function updateSession(request: NextRequest) {
 
   if (isPublic) return response;
 
+  // Guard: if Supabase env vars aren't configured (e.g. not set in the host),
+  // don't crash the whole site with MIDDLEWARE_INVOCATION_FAILED. Let the
+  // request through — the page-level auth checks will handle gating.
+  const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const SUPA_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!SUPA_URL || !SUPA_ANON) {
+    console.error('[middleware] Missing Supabase env vars — skipping auth gate. Set NEXT_PUBLIC_SUPABASE_URL & NEXT_PUBLIC_SUPABASE_ANON_KEY in your host.');
+    return response;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPA_URL,
+    SUPA_ANON,
     {
       cookies: {
         getAll() {
@@ -63,42 +73,34 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Wrap all auth logic — any unexpected runtime error must NOT 500 the site.
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  // ── Not logged in → redirect to appropriate login ─────────────────
-  if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = path.startsWith('/admin') ? '/admin/login' : '/login';
-    url.searchParams.set('redirect', path);
-    // Also clear stale role cookie
-    const r = NextResponse.redirect(url);
-    r.cookies.delete(ADMIN_ROLE_COOKIE);
-    return r;
-  }
-
-  // ── Admin routes → must be in admin_users table ───────────────────
-  if (path.startsWith('/admin')) {
-    const cachedRole = request.cookies.get(ADMIN_ROLE_COOKIE)?.value;
-
-    // Fast path: trust the cached cookie (still safe — pages/RLS re-check)
-    if (cachedRole === 'admin') {
-      return response;
+    // ── Not logged in → redirect to appropriate login ───────────────
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = path.startsWith('/admin') ? '/admin/login' : '/login';
+      url.searchParams.set('redirect', path);
+      const r = NextResponse.redirect(url);
+      r.cookies.delete(ADMIN_ROLE_COOKIE);
+      return r;
     }
 
-    // Slow path: verify with DB and cache the result.
-    // Try with is_active; if that column doesn't exist yet (migrations not run),
-    // fall back to a plain existence check so valid admins are never locked out.
-    let admin: { id: string; is_active?: boolean } | null = null;
-    {
+    // ── Admin routes → must be in admin_users table ─────────────────
+    if (path.startsWith('/admin')) {
+      const cachedRole = request.cookies.get(ADMIN_ROLE_COOKIE)?.value;
+      if (cachedRole === 'admin') return response;
+
+      let admin: { id: string; is_active?: boolean } | null = null;
       const res = await supabase
         .from('admin_users')
         .select('id, is_active')
         .eq('id', user.id)
         .maybeSingle();
       if (res.error) {
-        // Column missing or other schema issue → fall back to existence-only
         const fb = await supabase
           .from('admin_users')
           .select('id')
@@ -108,26 +110,28 @@ export async function updateSession(request: NextRequest) {
       } else {
         admin = res.data;
       }
+
+      if (!admin || admin.is_active === false) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/admin/login';
+        url.searchParams.set('error', 'not_admin');
+        const r = NextResponse.redirect(url);
+        r.cookies.delete(ADMIN_ROLE_COOKIE);
+        return r;
+      }
+
+      response.cookies.set(ADMIN_ROLE_COOKIE, 'admin', {
+        maxAge: ROLE_COOKIE_MAX_AGE,
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+      });
     }
 
-    if (!admin || admin.is_active === false) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/admin/login';
-      url.searchParams.set('error', 'not_admin');
-      const r = NextResponse.redirect(url);
-      r.cookies.delete(ADMIN_ROLE_COOKIE);
-      return r;
-    }
-
-    // Cache the role so subsequent admin navigations skip the DB lookup
-    response.cookies.set(ADMIN_ROLE_COOKIE, 'admin', {
-      maxAge: ROLE_COOKIE_MAX_AGE,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    });
+    return response;
+  } catch (e) {
+    console.error('[middleware] auth check failed, allowing request through:', e);
+    return response;
   }
-
-  return response;
 }
