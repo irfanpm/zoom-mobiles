@@ -1,12 +1,16 @@
+import { redirect } from 'next/navigation';
 import { Tag } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 import BrandsManager from './brands-manager';
 
 export const metadata = { title: 'Brands — Admin' };
 export const dynamic = 'force-dynamic';
 
 export default async function AdminBrandsPage() {
-  const supabase = await createClient();
+  const me = await getCurrentAdmin();
+  if (!me) redirect('/admin/login');
+  const supabase = createServiceClient();
   const { data: brands } = await supabase
     .from('brands')
     .select('*')

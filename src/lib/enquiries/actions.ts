@@ -55,13 +55,15 @@ export async function logEnquiry(items: DbEnquiryItem[], message?: string) {
 
 // ── Admin updates enquiry status ──
 export async function updateEnquiryStatus(id: string, status: EnquiryStatus) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not authenticated' };
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) return { error: 'Admin required' };
+  let supabase;
+  try {
+    const { requireAdmin } = await import('@/lib/auth/admin-guard');
+    ({ supabase } = await requireAdmin('enquiries_manage'));
+  } catch (e: any) {
+    return { error: e.message };
+  }
 
+  // RLS scopes this: sub-admins can only touch enquiries from their own customers
   const { error } = await supabase.from('enquiries').update({ status }).eq('id', id);
   if (error) return { error: error.message };
   revalidatePath('/admin/enquiries');
@@ -70,12 +72,13 @@ export async function updateEnquiryStatus(id: string, status: EnquiryStatus) {
 
 // ── Admin deletes enquiry ──
 export async function deleteEnquiry(id: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not authenticated' };
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) return { error: 'Admin required' };
+  let supabase;
+  try {
+    const { requireAdmin } = await import('@/lib/auth/admin-guard');
+    ({ supabase } = await requireAdmin('enquiries_manage'));
+  } catch (e: any) {
+    return { error: e.message };
+  }
 
   const { error } = await supabase.from('enquiries').delete().eq('id', id);
   if (error) return { error: error.message };

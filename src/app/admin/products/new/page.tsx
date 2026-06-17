@@ -1,12 +1,17 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 import ProductForm from '@/components/admin/ProductForm';
 
 export const metadata = { title: 'New Product — Admin' };
+export const dynamic = 'force-dynamic';
 
 export default async function NewProductPage() {
-  const supabase = await createClient();
+  const me = await getCurrentAdmin();
+  if (!me) redirect('/admin/login');
+  const supabase = createServiceClient();
   const [{ data: categories }, { data: brands }] = await Promise.all([
     supabase.from('categories').select('id, name').order('sort_order'),
     supabase.from('brands').select('id, name').eq('is_active', true).order('sort_order'),

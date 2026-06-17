@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+import { cache } from 'react';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import type { PublicProduct, DbProduct, DbCategory, DbSettings, DbBrand } from '@/lib/supabase/types';
 
 /**
@@ -140,14 +141,14 @@ export async function fetchProductsByCategory(slug: string): Promise<PublicProdu
   return filtered.map((p) => toPublic(p as any, access.noEnquire));
 }
 
-export async function fetchAllCategories(): Promise<DbCategory[]> {
+export const fetchAllCategories = cache(async function fetchAllCategories(): Promise<DbCategory[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('categories')
     .select('*')
     .order('sort_order');
   return (data ?? []) as DbCategory[];
-}
+});
 
 export async function fetchCategoryBySlug(slug: string): Promise<DbCategory | null> {
   const supabase = await createClient();
@@ -174,7 +175,9 @@ export async function fetchVisibleBrands(): Promise<DbBrand[]> {
   return filtered as DbBrand[];
 }
 
-export async function fetchSettings(): Promise<DbSettings> {
+// React `cache()` dedupes calls within a single render — if multiple
+// server components call fetchSettings(), only one Supabase round-trip happens.
+export const fetchSettings = cache(async function fetchSettings(): Promise<DbSettings> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('settings').select('*').eq('id', 1).maybeSingle();
@@ -189,9 +192,9 @@ export async function fetchSettings(): Promise<DbSettings> {
     address: 'India',
     updated_at: new Date().toISOString(),
   };
-}
+});
 
-export async function fetchCurrentCustomer() {
+export const fetchCurrentCustomer = cache(async function fetchCurrentCustomer() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -201,4 +204,62 @@ export async function fetchCurrentCustomer() {
     .eq('id', user.id)
     .maybeSingle();
   return data ?? null;
-}
+});
+
+/**
+ * Resolve which WhatsApp number a logged-in customer's enquiries should go to:
+ * the admin who created them (customers.created_by → admin_users.whatsapp_number).
+ * Returns null for anonymous users, admins, or when the owning admin has no number
+ * — callers then fall back to the global settings number.
+ *
+ * Uses the service-role client to read admin_users because RLS blocks customers
+ * from reading admin rows. Server-side only; reads just the WhatsApp fields.
+ */
+export const resolveCustomerWhatsApp = cache(async function resolveCustomerWhatsApp(): Promise<
+  { whatsapp_number: string; whatsapp_display: string } | null
+> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // Customer can read their own row (RLS: "customers self read") → get created_by
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('created_by')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (!customer?.created_by) return null;
+
+  // Owning admin's WhatsApp — via service role (customers can't read admin_users)
+  let svc;
+  try {
+    svc = createServiceClient();
+  } catch {
+    return null; // service key not configured → fall back to global number
+  }
+
+  // Resilient select: try the full set, fall back to base columns if the
+  // whatsapp columns don't exist yet (pre-migration). `select('*')` never
+  // errors on missing columns, so routing works on any schema state.
+  const { data: admin } = await svc
+    .from('admin_users')
+    .select('*')
+    .eq('id', customer.created_by)
+    .maybeSingle();
+
+  if (!admin || admin.is_active === false) return null;
+
+  // Priority: explicit WhatsApp number → admin's phone (common: same number).
+  const number: string | null =
+    (admin.whatsapp_number as string) || (admin.phone as string) || null;
+
+  if (number) {
+    const display =
+      (admin.whatsapp_display as string) ||
+      (admin.whatsapp_number as string) ||
+      (admin.phone as string) ||
+      number;
+    return { whatsapp_number: number, whatsapp_display: display };
+  }
+  return null;
+});

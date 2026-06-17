@@ -35,6 +35,7 @@ type Customer = {
   notes: string | null;
   is_active: boolean;
   created_at: string;
+  created_by: string | null;
 };
 
 type Brand = {
@@ -55,10 +56,19 @@ export default function CustomersManager({
   customers,
   brands,
   accessRows,
+  ownerNames = {},
+  showOwner = false,
+  admins = [],
 }: {
   customers: Customer[];
   brands: Brand[];
   accessRows: AccessRow[];
+  /** Map of admin id → admin name, for the "Added By" column. */
+  ownerNames?: Record<string, string>;
+  /** Show the "Added By" column + reassign dropdown (super admin only). */
+  showOwner?: boolean;
+  /** List of admins for the "Assigned To" reassign dropdown (super admin). */
+  admins?: { id: string; full_name: string; role: string }[];
 }) {
   const [items, setItems] = useState(customers);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -146,6 +156,7 @@ export default function CustomersManager({
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Customer</th>
                   <th className="text-left font-medium px-4 py-3">Contact</th>
+                  {showOwner && <th className="text-left font-medium px-4 py-3">Added By</th>}
                   <th className="text-center font-medium px-4 py-3">Access</th>
                   <th className="text-center font-medium px-4 py-3">Status</th>
                   <th className="text-right font-medium px-4 py-3">Actions</th>
@@ -179,6 +190,18 @@ export default function CustomersManager({
                           </div>
                         )}
                       </td>
+                      {showOwner && (
+                        <td className="px-4 py-3 text-xs">
+                          {c.created_by && ownerNames[c.created_by] ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary/5 border border-secondary/20 px-2 py-0.5 text-secondary font-medium">
+                              <ShieldCheck className="h-3 w-3" />
+                              {ownerNames[c.created_by]}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">— unassigned</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-center">
                         {restrictions > 0 ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 text-warning border border-warning/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
@@ -287,6 +310,30 @@ export default function CustomersManager({
               </div>
               <Input name="notes" label="Notes (admin only)" defaultValue={editing.notes ?? ''} />
               <Input name="new_password" label="Reset password (optional)" placeholder="New password (leave blank to keep)" />
+
+              {showOwner && admins.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-dark-700 flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-secondary" />
+                    Assigned To (admin who manages this customer)
+                  </label>
+                  <select
+                    name="assign_to"
+                    defaultValue={editing.created_by ?? ''}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="">— Unassigned —</option>
+                    {admins.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.full_name}{a.role === 'super_admin' ? ' (Super Admin)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400">
+                    Reassign this customer to another admin. Their enquiries will route to that admin&apos;s WhatsApp.
+                  </p>
+                </div>
+              )}
 
               <label className="flex items-center justify-between py-2 cursor-pointer">
                 <span className="text-sm text-dark-700">Customer is active</span>

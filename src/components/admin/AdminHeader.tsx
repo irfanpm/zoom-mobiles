@@ -38,6 +38,7 @@ export default function AdminHeader({
           <button
             type="submit"
             disabled={pending}
+            suppressHydrationWarning
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-danger disabled:opacity-60"
           >
             <LogOut className="h-3.5 w-3.5" />

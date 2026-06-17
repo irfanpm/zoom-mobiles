@@ -121,6 +121,13 @@ export interface DbSettings {
   email: string | null;
   phone: string | null;
   address: string | null;
+  // branding (Appearance editor — super admin only)
+  logo_url?: string | null;
+  theme_primary?: string | null;
+  theme_secondary?: string | null;
+  theme_accent?: string | null;
+  about_title?: string | null;
+  about_content?: string | null;
   updated_at: string;
 }
 

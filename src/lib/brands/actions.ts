@@ -1,15 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin as guard } from '@/lib/auth/admin-guard';
+import type { PermissionKey } from '@/lib/permissions';
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) throw new Error('Admin access required');
+async function requireAdmin(perm: PermissionKey = 'brands_manage') {
+  const { supabase } = await guard(perm);
   return supabase;
 }
 
@@ -18,7 +14,12 @@ function slugify(s: string) {
 }
 
 export async function saveBrand(formData: FormData) {
-  const supabase = await requireAdmin();
+  let supabase;
+  try {
+    supabase = await requireAdmin();
+  } catch (e: any) {
+    return { error: e.message };
+  }
   const id = String(formData.get('id') ?? '');
   const name = String(formData.get('name') ?? '').trim();
   const slug = (String(formData.get('slug') ?? '').trim() || slugify(name));
@@ -58,7 +59,12 @@ export async function saveBrand(formData: FormData) {
 }
 
 export async function deleteBrand(id: string) {
-  const supabase = await requireAdmin();
+  let supabase;
+  try {
+    supabase = await requireAdmin();
+  } catch (e: any) {
+    return { error: e.message };
+  }
   const { error } = await supabase.from('brands').delete().eq('id', id);
   if (error) return { error: error.message };
   revalidatePath('/admin/brands');
@@ -81,7 +87,12 @@ export async function saveCustomerBrandAccess(
   customer_id: string,
   rows: BrandAccessInput[],
 ) {
-  const supabase = await requireAdmin();
+  let supabase;
+  try {
+    supabase = await requireAdmin('customers_access');
+  } catch (e: any) {
+    return { error: e.message };
+  }
   if (!customer_id) return { error: 'Missing customer_id' };
 
   // Split into "restricted" (need a row) and "default" (delete the row)

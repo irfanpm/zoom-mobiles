@@ -1,4 +1,7 @@
+'use client';
+
 import { cn } from '@/lib/utils';
+import { useSettings } from '@/components/providers/SettingsProvider';
 
 interface LogoProps {
   className?: string;
@@ -7,18 +10,32 @@ interface LogoProps {
 }
 
 export function Logo({ className, showText = true, variant = 'default' }: LogoProps) {
+  const settings = useSettings();
+  const name = settings.company_name || 'Zoom Mobiles';
+  const [first, ...rest] = name.split(' ');
+
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
-      <LogoMark className="h-9 w-9" />
+      {settings.logo_url ? (
+        // Custom logo uploaded via Appearance editor
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={settings.logo_url}
+          alt={name}
+          className="h-9 w-9 shrink-0 rounded-xl object-contain"
+        />
+      ) : (
+        <LogoMark className="h-9 w-9" />
+      )}
       {showText && (
         <div className="flex flex-col leading-none">
           <span
             className={cn(
-              'text-[17px] font-extrabold tracking-tight',
+              'text-[17px] font-extrabold tracking-tight uppercase',
               variant === 'white' ? 'text-white' : 'text-dark-900'
             )}
           >
-            ZOOM <span className="text-primary">MOBILES</span>
+            {first} {rest.length > 0 && <span className="text-primary">{rest.join(' ')}</span>}
           </span>
           <span
             className={cn(
@@ -26,7 +43,7 @@ export function Logo({ className, showText = true, variant = 'default' }: LogoPr
               variant === 'white' ? 'text-white/70' : 'text-dark-500'
             )}
           >
-            Accessories Hub
+            {settings.tagline ? settings.tagline.slice(0, 28) : 'Accessories Hub'}
           </span>
         </div>
       )}

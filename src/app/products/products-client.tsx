@@ -1,25 +1,41 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Inbox, Sparkles, Flame } from 'lucide-react';
 import { FilterBar } from '@/components/products/FilterBar';
 import { ProductCard } from '@/components/products/ProductCard';
-import { ProductDetailModal } from '@/components/products/ProductDetailModal';
 import { ProductSkeleton } from '@/components/products/ProductSkeleton';
 import { Button } from '@/components/ui/button';
 import type { Product, StockStatus } from '@/types';
 
+// Lazy-load the modal — only loaded when a customer clicks a product detail.
+// Cuts ~25kB off the initial bundle.
+const ProductDetailModal = dynamic(
+  () => import('@/components/products/ProductDetailModal').then((m) => ({ default: m.ProductDetailModal })),
+  { ssr: false },
+);
+
 type Sort = 'name' | 'stock-high' | 'stock-low' | 'price-low' | 'price-high';
+
+type Diagnostic = {
+  totalPublished: number;
+  totalBrands: number;
+  restrictedBrands: number;
+  unbrandedProducts: number;
+} | null;
 
 export default function ProductsClient({
   products: ALL,
   categories,
   customerName,
+  diagnostic = null,
 }: {
   products: Product[];
   categories: { slug: string; name: string }[];
   customerName: string | null;
+  diagnostic?: Diagnostic;
 }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -149,7 +165,11 @@ export default function ProductsClient({
             {Array.from({ length: 10 }).map((_, i) => <ProductSkeleton key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState onReset={handleReset} />
+          ALL.length === 0 && diagnostic ? (
+            <EmptyCatalog diagnostic={diagnostic} customerName={customerName} />
+          ) : (
+            <EmptyState onReset={handleReset} />
+          )
         ) : (
           <motion.div layout className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             <AnimatePresence mode="popLayout">
@@ -212,6 +232,77 @@ function EmptyState({ onReset }: { onReset: () => void }) {
         Try clearing some filters or searching for a different product or brand.
       </p>
       <Button className="mt-6" onClick={onReset}>Reset filters</Button>
+    </div>
+  );
+}
+
+/**
+ * Shown when the catalog has 0 products — diagnoses the cause and tells the
+ * customer exactly what's wrong (DB empty / brand restrictions / unbranded).
+ */
+function EmptyCatalog({
+  diagnostic,
+  customerName,
+}: {
+  diagnostic: { totalPublished: number; totalBrands: number; restrictedBrands: number; unbrandedProducts: number };
+  customerName: string | null;
+}) {
+  const { totalPublished, totalBrands, restrictedBrands, unbrandedProducts } = diagnostic;
+
+  let title: string;
+  let message: string;
+  let action: { label: string; href: string } | null = null;
+
+  if (totalPublished === 0) {
+    title = 'Catalog is being prepared';
+    message = `Our team is adding products. Please check back soon — or contact us on WhatsApp for immediate enquiries.`;
+  } else if (totalBrands === 0) {
+    title = 'Catalog setup in progress';
+    message = 'Brands are being configured. This usually takes a few minutes.';
+  } else if (restrictedBrands > 0 && restrictedBrands >= totalBrands) {
+    title = 'Your account has no brand access yet';
+    message = `${customerName ? customerName.split(' ')[0] + ',' : 'Hi,'} you currently don't have permission to view any brands. Please contact Zoom Mobiles to request catalog access.`;
+    action = {
+      label: 'Request Access on WhatsApp',
+      href: 'https://wa.me/919207908718?text=Hello%2C+please+enable+brand+access+for+my+account.',
+    };
+  } else if (unbrandedProducts === totalPublished) {
+    title = 'Products need brand setup';
+    message = `${totalPublished} products are published but none have a brand assigned. Restricted accounts can only see properly-branded products. Please contact us.`;
+    action = {
+      label: 'Notify on WhatsApp',
+      href: 'https://wa.me/919207908718?text=Hello%2C+the+catalog+products+need+brand+setup.',
+    };
+  } else {
+    title = 'No products available for your account';
+    message = `${customerName ? customerName.split(' ')[0] + ',' : ''} ${restrictedBrands} of ${totalBrands} brands are restricted on your account. Contact us to expand your access.`;
+    action = {
+      label: 'Request More Access',
+      href: 'https://wa.me/919207908718?text=Hello%2C+please+expand+my+brand+access.',
+    };
+  }
+
+  return (
+    <div className="rounded-2xl border border-dashed border-dark-300 bg-white p-16 text-center">
+      <div className="mx-auto h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+        <Inbox className="h-8 w-8 text-primary" />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-dark-900">{title}</h3>
+      <p className="mt-2 text-sm text-dark-500 max-w-md mx-auto">{message}</p>
+
+      {action && (
+        <Button asChild className="mt-6">
+          <a href={action.href} target="_blank" rel="noopener noreferrer">
+            {action.label}
+          </a>
+        </Button>
+      )}
+
+      {/* Discreet debug breadcrumb at the bottom — helps admin troubleshoot */}
+      <div className="mt-8 pt-4 border-t border-dark-200/60 text-[10px] text-dark-400 max-w-md mx-auto">
+        Diagnostics · {totalPublished} published · {totalBrands} brands ·
+        {' '}{restrictedBrands} restricted · {unbrandedProducts} unbranded
+      </div>
     </div>
   );
 }

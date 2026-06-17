@@ -3,9 +3,9 @@ import { headers } from 'next/headers';
 import { Toaster } from 'sonner';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { FloatingEnquiryBar } from '@/components/enquiry/FloatingEnquiryBar';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
-import { fetchSettings } from '@/lib/catalog';
+import LazyFloatingEnquiryBar from '@/components/enquiry/LazyFloatingEnquiryBar';
+import { fetchSettings, resolveCustomerWhatsApp } from '@/lib/catalog';
 import { siteConfig } from '@/lib/config';
 import './globals.css';
 
@@ -49,12 +49,26 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-/** Don't cache layout — admin can change WhatsApp number any time. */
-export const dynamic = 'force-dynamic';
+/**
+ * Cache the layout for 60s. Admin edits trigger `revalidatePath('/', 'layout')`
+ * in `saveSettings` so changes are visible within a few seconds — and customer
+ * navigation stays instant because the layout is reused across page transitions.
+ */
+export const revalidate = 60;
+
+/** Convert "#00C853" → "0 200 83" (RGB triplet for Tailwind alpha support). */
+function hexToRgbTriplet(hex: string | null | undefined, fallback: string): string {
+  const v = (hex ?? '').trim();
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(v);
+  if (!m) return fallback;
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Try to fetch live settings; fall back gracefully if Supabase isn't configured yet
   let settings;
+  let theme = { primary: '0 200 83', secondary: '0 102 255', accent: '255 184 0' };
   try {
     const s = await fetchSettings();
     settings = {
@@ -65,7 +79,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       email: s.email,
       phone: s.phone,
       address: s.address,
+      logo_url: s.logo_url ?? null,
     };
+    theme = {
+      primary: hexToRgbTriplet(s.theme_primary, '0 200 83'),
+      secondary: hexToRgbTriplet(s.theme_secondary, '0 102 255'),
+      accent: hexToRgbTriplet(s.theme_accent, '255 184 0'),
+    };
+
+    // Per-admin routing: if a logged-in customer belongs to an admin with their
+    // own WhatsApp number, route ALL their enquiries to that admin's number.
+    try {
+      const adminWa = await resolveCustomerWhatsApp();
+      if (adminWa) {
+        settings.whatsapp_number = adminWa.whatsapp_number;
+        settings.whatsapp_display = adminWa.whatsapp_display;
+      }
+    } catch {
+      // ignore — keep global number
+    }
   } catch {
     settings = {
       whatsapp_number: siteConfig.whatsappNumber,
@@ -75,6 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       email: siteConfig.email,
       phone: siteConfig.phone,
       address: siteConfig.address,
+      logo_url: null,
     };
   }
 
@@ -87,6 +120,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Live theme from Appearance editor (super admin) — overrides Tailwind brand colors */}
+        <style>{`:root{--brand-primary:${theme.primary};--brand-secondary:${theme.secondary};--brand-accent:${theme.accent};}`}</style>
+      </head>
       <body className="min-h-dvh bg-background flex flex-col" suppressHydrationWarning>
         <SettingsProvider value={settings}>
           {isBareRoute ? (
@@ -96,7 +133,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Header />
               <main className="flex-1 pb-32">{children}</main>
               <Footer />
-              <FloatingEnquiryBar />
+              <LazyFloatingEnquiryBar />
             </>
           )}
         </SettingsProvider>

@@ -51,6 +51,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        // Browser form-fill extensions (Edge autofill, LastPass, 1Password)
+        // inject `fdprocessedid` into every <button> after server-render.
+        // Suppress the hydration warning — it's a false positive.
+        suppressHydrationWarning
         {...props}
       />
     );

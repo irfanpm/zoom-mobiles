@@ -135,6 +135,8 @@ async function main() {
         id: userId,
         full_name: ADMIN_FULL_NAME,
         role: ADMIN_ROLE,
+        email: ADMIN_EMAIL,
+        is_active: true,
       }),
     },
   );

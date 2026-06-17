@@ -10,6 +10,7 @@ export interface ClientSettings {
   email: string | null;
   phone: string | null;
   address: string | null;
+  logo_url?: string | null;
 }
 
 const DEFAULTS: ClientSettings = {
@@ -20,6 +21,7 @@ const DEFAULTS: ClientSettings = {
   email: 'sales@zoommobiles.in',
   phone: '+91 92079 08718',
   address: 'India',
+  logo_url: null,
 };
 
 const SettingsContext = createContext<ClientSettings>(DEFAULTS);

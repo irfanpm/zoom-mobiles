@@ -23,7 +23,8 @@ const config: Config = {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         primary: {
-          DEFAULT: '#00C853',
+          // Live-themable via Appearance editor (CSS var injected in root layout)
+          DEFAULT: 'rgb(var(--brand-primary, 0 200 83) / <alpha-value>)',
           50: '#E8F8EE',
           100: '#C4EFD2',
           200: '#9CE5B5',
@@ -37,7 +38,7 @@ const config: Config = {
           foreground: '#FFFFFF',
         },
         secondary: {
-          DEFAULT: '#0066FF',
+          DEFAULT: 'rgb(var(--brand-secondary, 0 102 255) / <alpha-value>)',
           50: '#E6F0FF',
           100: '#B8D3FF',
           200: '#8AB5FF',
@@ -51,7 +52,7 @@ const config: Config = {
           foreground: '#FFFFFF',
         },
         accent: {
-          DEFAULT: '#FFB800',
+          DEFAULT: 'rgb(var(--brand-accent, 255 184 0) / <alpha-value>)',
           50: '#FFF7E0',
           100: '#FFEBB3',
           200: '#FFDF85',

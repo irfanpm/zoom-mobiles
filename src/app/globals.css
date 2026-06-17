@@ -4,6 +4,12 @@
 
 @layer base {
   :root {
+    /* Brand theme (RGB triplets) — overridden at runtime by the Appearance
+       editor via an inline <style> in the root layout. These are fallbacks. */
+    --brand-primary: 0 200 83;
+    --brand-secondary: 0 102 255;
+    --brand-accent: 255 184 0;
+
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
 

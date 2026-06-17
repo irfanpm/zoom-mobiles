@@ -23,12 +23,12 @@ export default async function AboutPage() {
           <div className="max-w-3xl">
             <span className="chip bg-primary/10 text-primary-700">About {settings.company_name}</span>
             <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-dark-900 text-balance">
-              India&apos;s most trusted mobile accessories wholesale platform.
+              {settings.about_title ||
+                "India's most trusted mobile accessories wholesale platform."}
             </h1>
-            <p className="mt-5 text-lg text-dark-600">
-              We supply 10,000+ retail mobile shops across India with original and compatible
-              accessories — from power banks and TWS to chargers and replacement batteries.
-              Every product, every brand, every model — all under one roof.
+            <p className="mt-5 text-lg text-dark-600 whitespace-pre-line">
+              {settings.about_content ||
+                'We supply 10,000+ retail mobile shops across India with original and compatible accessories — from power banks and TWS to chargers and replacement batteries. Every product, every brand, every model — all under one roof.'}
             </p>
             <div className="mt-8 flex gap-3">
               <Button asChild size="lg">

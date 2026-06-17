@@ -60,13 +60,17 @@ export async function loginAdmin(formData: FormData) {
 
   const { data: admin } = await supabase
     .from('admin_users')
-    .select('id')
+    .select('id, is_active')
     .eq('id', data.user.id)
     .maybeSingle();
 
   if (!admin) {
     await supabase.auth.signOut();
     return { error: 'This account does not have admin access.' };
+  }
+  if (admin.is_active === false) {
+    await supabase.auth.signOut();
+    return { error: 'Your admin account has been disabled. Contact the super admin.' };
   }
 
   revalidatePath('/', 'layout');
@@ -77,19 +81,24 @@ export async function loginAdmin(formData: FormData) {
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  // Clear the perf-cache role cookie (set by middleware) so a different
+  // user logging in on the same device doesn't inherit admin status.
+  const { cookies } = await import('next/headers');
+  const cookieStore = await cookies();
+  cookieStore.delete('zm_role');
   revalidatePath('/', 'layout');
   redirect('/login');
 }
 
 // ── ADMIN: CREATE CUSTOMER ────────────────────────────────────────
 export async function createCustomer(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not authenticated' };
-
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) return { error: 'Admin access required' };
+  let me;
+  try {
+    const { requireAdmin } = await import('@/lib/auth/admin-guard');
+    ({ admin: me } = await requireAdmin('customers_add'));
+  } catch (e: any) {
+    return { error: e.message };
+  }
 
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const password = String(formData.get('password') ?? '');
@@ -120,7 +129,7 @@ export async function createCustomer(formData: FormData) {
     return { error: authErr?.message ?? 'Failed to create user.' };
   }
 
-  const { error: rowErr } = await admin_db.from('customers').insert({
+  const baseRow = {
     id: created.user.id,
     full_name,
     company_name,
@@ -129,7 +138,14 @@ export async function createCustomer(formData: FormData) {
     city,
     notes,
     is_active: true,
-  });
+  };
+
+  // Try with ownership column; if `created_by` doesn't exist yet (migration 008
+  // not run), retry without it so customer creation still works.
+  let rowErr = (await admin_db.from('customers').insert({ ...baseRow, created_by: me.id })).error;
+  if (rowErr && /created_by/.test(rowErr.message)) {
+    rowErr = (await admin_db.from('customers').insert(baseRow)).error;
+  }
 
   if (rowErr) {
     await admin_db.auth.admin.deleteUser(created.user.id);
@@ -142,16 +158,26 @@ export async function createCustomer(formData: FormData) {
 
 // ── ADMIN: UPDATE CUSTOMER (incl. reset password) ─────────────────
 export async function updateCustomer(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not authenticated' };
-
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) return { error: 'Admin access required' };
+  let me;
+  try {
+    const { requireAdmin } = await import('@/lib/auth/admin-guard');
+    ({ admin: me } = await requireAdmin('customers_edit'));
+  } catch (e: any) {
+    return { error: e.message };
+  }
 
   const id = String(formData.get('id') ?? '');
   if (!id) return { error: 'Missing customer id' };
+
+  // Ownership check: sub-admin may only edit customers they created
+  if (me.role !== 'super_admin') {
+    const ownCheck = createServiceClient();
+    const { data: row } = await ownCheck
+      .from('customers').select('created_by').eq('id', id).maybeSingle();
+    if (!row || row.created_by !== me.id) {
+      return { error: 'You can only edit customers you created.' };
+    }
+  }
 
   const full_name = String(formData.get('full_name') ?? '').trim();
   const company_name = String(formData.get('company_name') ?? '').trim() || null;
@@ -161,12 +187,33 @@ export async function updateCustomer(formData: FormData) {
   const is_active = formData.get('is_active') === 'on';
   const new_password = String(formData.get('new_password') ?? '');
 
+  // Super admin can reassign the customer to another admin ("Assigned To").
+  const assignTo = String(formData.get('assign_to') ?? '').trim();
+
   const admin_db = createServiceClient();
 
-  const { error: rowErr } = await admin_db
-    .from('customers')
-    .update({ full_name, company_name, phone, city, notes, is_active })
-    .eq('id', id);
+  const updateData: Record<string, unknown> = {
+    full_name, company_name, phone, city, notes, is_active,
+  };
+  if (me.role === 'super_admin' && assignTo) {
+    updateData.created_by = assignTo;
+  }
+
+  let rowErr = (await admin_db.from('customers').update(updateData).eq('id', id)).error;
+  // If created_by column missing (pre-migration) AND the admin tried to assign,
+  // surface a clear, actionable error instead of silently dropping it.
+  if (rowErr && /created_by/.test(rowErr.message)) {
+    if (updateData.created_by) {
+      return {
+        error:
+          'Customer assignment needs a database update. Run this once in Supabase SQL Editor:  ' +
+          'alter table public.customers add column if not exists created_by uuid references public.admin_users(id); ' +
+          "notify pgrst, 'reload schema';",
+      };
+    }
+    delete updateData.created_by;
+    rowErr = (await admin_db.from('customers').update(updateData).eq('id', id)).error;
+  }
 
   if (rowErr) return { error: rowErr.message };
 
@@ -181,20 +228,31 @@ export async function updateCustomer(formData: FormData) {
   }
 
   revalidatePath('/admin/customers');
+  revalidatePath('/', 'layout'); // WhatsApp routing may have changed owner
   return { success: true, new_password: new_password || undefined };
 }
 
 // ── ADMIN: DELETE CUSTOMER ────────────────────────────────────────
 export async function deleteCustomer(id: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not authenticated' };
-
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) return { error: 'Admin access required' };
+  let me;
+  try {
+    const { requireAdmin } = await import('@/lib/auth/admin-guard');
+    ({ admin: me } = await requireAdmin('customers_delete'));
+  } catch (e: any) {
+    return { error: e.message };
+  }
 
   const admin_db = createServiceClient();
+
+  // Ownership check: sub-admin may only delete customers they created
+  if (me.role !== 'super_admin') {
+    const { data: row } = await admin_db
+      .from('customers').select('created_by').eq('id', id).maybeSingle();
+    if (!row || row.created_by !== me.id) {
+      return { error: 'You can only delete customers you created.' };
+    }
+  }
+
   const { error } = await admin_db.auth.admin.deleteUser(id);
   if (error) return { error: error.message };
 

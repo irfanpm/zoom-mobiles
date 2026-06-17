@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Plus, Search, Filter, Package } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 import ProductsTable from './products-table';
 
 export const metadata = { title: 'Products — Admin' };
@@ -12,7 +14,9 @@ export default async function AdminProductsPage({
   searchParams: Promise<{ q?: string; category?: string; brand?: string; stock?: string }>;
 }) {
   const sp = await searchParams;
-  const supabase = await createClient();
+  const me = await getCurrentAdmin();
+  if (!me) redirect('/admin/login');
+  const supabase = createServiceClient();
 
   let query = supabase
     .from('products')

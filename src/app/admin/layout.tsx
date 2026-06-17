@@ -1,33 +1,32 @@
 import type { ReactNode } from 'react';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 
 export const metadata = {
   title: 'Admin — Zoom Mobiles',
 };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const admin = await getCurrentAdmin();
 
-  let admin = null;
-  if (user) {
-    const { data } = await supabase
-      .from('admin_users')
-      .select('full_name, role')
-      .eq('id', user.id)
-      .maybeSingle();
-    admin = data;
+  if (!admin) {
+    // /admin/login legitimately renders without a session — pass through.
+    // Any other admin route without a valid ACTIVE admin (e.g. account was
+    // disabled while the middleware role-cookie is still warm) → force login.
+    const h = await headers();
+    const pathname = h.get('x-pathname') ?? '';
+    if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+      redirect('/admin/login?error=not_admin');
+    }
+    return <>{children}</>;
   }
-
-  // If we're on /admin/login the middleware doesn't gate us; render without shell.
-  // We detect by checking if admin row exists.
-  if (!admin) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <AdminSidebar />
+      <AdminSidebar role={admin.role} />
       <div className="lg:pl-64">
         <AdminHeader adminName={admin.full_name} adminRole={admin.role} />
         <main className="p-4 sm:p-6 lg:p-8">{children}</main>

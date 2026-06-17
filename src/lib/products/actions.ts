@@ -2,16 +2,19 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import type { StockStatus } from '@/lib/supabase/types';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  ALLOWED_IMAGE_MIME,
+  ALLOWED_IMAGE_EXT_LABEL,
+} from '@/lib/config';
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) throw new Error('Admin access required');
+import { requireAdmin as guard } from '@/lib/auth/admin-guard';
+import type { PermissionKey } from '@/lib/permissions';
+
+async function requireAdmin(perm?: PermissionKey) {
+  const { supabase } = await guard(perm);
   return supabase;
 }
 
@@ -26,9 +29,14 @@ function num(v: FormDataEntryValue | null): number | null {
 
 // ── CREATE / UPDATE PRODUCT ───────────────────────────────────────
 export async function saveProduct(formData: FormData) {
-  const supabase = await requireAdmin();
-
   const id = String(formData.get('id') ?? '');
+  let supabase;
+  try {
+    supabase = await requireAdmin(id ? 'products_edit' : 'products_add');
+  } catch (e: any) {
+    return { error: e.message };
+  }
+
   const code = String(formData.get('code') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
   const description = String(formData.get('description') ?? '').trim() || null;
@@ -110,7 +118,12 @@ export async function saveProduct(formData: FormData) {
 
 // ── DELETE ────────────────────────────────────────────────────────
 export async function deleteProduct(id: string) {
-  const supabase = await requireAdmin();
+  let supabase;
+  try {
+    supabase = await requireAdmin('products_delete');
+  } catch (e: any) {
+    return { error: e.message };
+  }
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) return { error: error.message };
   revalidatePath('/admin/products');
@@ -124,7 +137,12 @@ export async function toggleProductField(
   field: 'is_published' | 'show_price' | 'show_stock' | 'show_moq' | 'show_box_qty',
   value: boolean,
 ) {
-  const supabase = await requireAdmin();
+  let supabase;
+  try {
+    supabase = await requireAdmin('products_edit');
+  } catch (e: any) {
+    return { error: e.message };
+  }
   const { error } = await supabase.from('products').update({ [field]: value }).eq('id', id);
   if (error) return { error: error.message };
   revalidatePath('/admin/products');
@@ -134,10 +152,33 @@ export async function toggleProductField(
 
 // ── UPLOAD IMAGE ──────────────────────────────────────────────────
 export async function uploadProductImage(formData: FormData): Promise<{ url?: string; error?: string }> {
-  const supabase = await requireAdmin();
+  let supabase;
+  try {
+    supabase = await requireAdmin('products_edit');
+  } catch (e: any) {
+    return { error: e.message };
+  }
   const file = formData.get('file') as File | null;
+
   if (!file) return { error: 'No file uploaded' };
-  if (file.size > 4 * 1024 * 1024) return { error: 'Image must be ≤ 4 MB' };
+
+  // Reject non-image / unsupported MIME types
+  if (file.type && !ALLOWED_IMAGE_MIME.includes(file.type)) {
+    return { error: `Unsupported file type. Allowed: ${ALLOWED_IMAGE_EXT_LABEL}` };
+  }
+
+  // Reject files larger than configured limit
+  if (file.size > MAX_IMAGE_BYTES) {
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    return {
+      error: `Image is ${sizeMB} MB — must be ≤ ${MAX_IMAGE_MB} MB. Compress with https://tinypng.com or https://squoosh.app`,
+    };
+  }
+
+  // Reject empty files
+  if (file.size === 0) {
+    return { error: 'File appears to be empty.' };
+  }
 
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
   const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;

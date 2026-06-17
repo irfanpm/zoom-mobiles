@@ -9,14 +9,19 @@ import {
   Plus,
   ArrowRight,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 
 export const metadata = { title: 'Dashboard — Admin' };
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export default async function AdminDashboard() {
-  const supabase = await createClient();
+  const me = await getCurrentAdmin();
+  if (!me) redirect('/admin/login');
+
+  // Service-client reads (bypass RLS), so dashboard always shows real counts.
+  const supabase = createServiceClient();
 
   const [{ count: totalProducts }, { count: published }, { count: outOfStock }, { count: totalCategories }, { count: totalCustomers }, { count: activeCustomers }, { count: totalEnquiries }, { count: newEnquiries }, { data: recentEnquiries }] =
     await Promise.all([

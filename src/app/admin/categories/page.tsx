@@ -1,11 +1,16 @@
+import { redirect } from 'next/navigation';
 import { FolderTree } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 import CategoriesManager from './categories-manager';
 
 export const metadata = { title: 'Categories — Admin' };
+export const dynamic = 'force-dynamic';
 
 export default async function AdminCategoriesPage() {
-  const supabase = await createClient();
+  const me = await getCurrentAdmin();
+  if (!me) redirect('/admin/login');
+  const supabase = createServiceClient();
   const { data: categories } = await supabase
     .from('categories')
     .select('*')

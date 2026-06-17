@@ -1,10 +1,16 @@
+import { redirect } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 import SettingsForm from './settings-form';
 
 export const metadata = { title: 'Settings — Admin' };
 
 export default async function AdminSettingsPage() {
+  const me = await getCurrentAdmin();
+  if (!me) redirect('/admin/login');
+  if (me.role !== 'super_admin') redirect('/admin'); // super admin only
+
   const supabase = await createClient();
   const { data: settings } = await supabase
     .from('settings')

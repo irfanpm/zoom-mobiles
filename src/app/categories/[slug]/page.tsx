@@ -8,9 +8,7 @@ import { CategoryProductGrid } from '@/components/products/CategoryProductGrid';
 import { fetchCategoryBySlug, fetchProductsByCategory } from '@/lib/catalog';
 import { toUIProduct } from '@/lib/data-mapper';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'force-no-store';
+export const revalidate = 10;
 
 export async function generateMetadata({
   params,

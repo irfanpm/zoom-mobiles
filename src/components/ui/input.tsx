@@ -13,6 +13,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           className
         )}
         ref={ref}
+        // Browser form-fill extensions stamp `fdprocessedid` on inputs after
+        // hydration. This is a false-positive mismatch — silence it globally.
+        suppressHydrationWarning
         {...props}
       />
     );

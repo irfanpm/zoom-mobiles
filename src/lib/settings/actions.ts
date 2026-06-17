@@ -1,15 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth/admin-guard';
 
 export async function saveSettings(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not authenticated' };
-  const { data: admin } = await supabase
-    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-  if (!admin) return { error: 'Admin required' };
+  let supabase;
+  try {
+    ({ supabase } = await requireAdmin());
+  } catch (e: any) {
+    return { error: e.message };
+  }
 
   const whatsapp_number = String(formData.get('whatsapp_number') ?? '')
     .replace(/\D/g, ''); // digits only

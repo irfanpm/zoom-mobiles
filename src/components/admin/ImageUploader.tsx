@@ -1,8 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, X, ImageIcon, Loader2, AlertCircle } from 'lucide-react';
 import { uploadProductImage } from '@/lib/products/actions';
+import {
+  MAX_IMAGE_MB,
+  MAX_IMAGE_BYTES,
+  ALLOWED_IMAGE_MIME,
+  ALLOWED_IMAGE_EXT_LABEL,
+} from '@/lib/config';
 
 export default function ImageUploader({
   name,
@@ -23,6 +29,28 @@ export default function ImageUploader({
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // ── Client-side checks first (saves a network round-trip) ──
+    if (file.type && !ALLOWED_IMAGE_MIME.includes(file.type)) {
+      setError(`Unsupported file type. Allowed: ${ALLOWED_IMAGE_EXT_LABEL}`);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+      setError(
+        `Image is ${sizeMB} MB — must be ≤ ${MAX_IMAGE_MB} MB. ` +
+          `Try compressing at tinypng.com or squoosh.app.`,
+      );
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    if (file.size === 0) {
+      setError('File appears to be empty.');
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+
     setBusy(true);
     setError(null);
     const fd = new FormData();
@@ -68,7 +96,9 @@ export default function ImageUploader({
             <>
               <Upload className="h-6 w-6" />
               <span className="text-sm font-medium">Click to upload</span>
-              <span className="text-[11px] text-slate-400">JPG / PNG / WebP · max 4 MB</span>
+              <span className="text-[11px] text-slate-400">
+                {ALLOWED_IMAGE_EXT_LABEL} · max {MAX_IMAGE_MB} MB
+              </span>
             </>
           )}
         </button>
@@ -77,15 +107,18 @@ export default function ImageUploader({
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept={ALLOWED_IMAGE_MIME.join(',')}
         className="hidden"
         onChange={onPick}
       />
 
       {error && (
-        <p className="mt-2 text-xs text-danger flex items-center gap-1">
-          <ImageIcon className="h-3 w-3" /> {error}
-        </p>
+        <div className="mt-2 flex items-start gap-2 rounded-lg bg-danger/5 border border-danger/20 px-2.5 py-2 text-xs text-danger">
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>{error}</span>
+          {/* keep ImageIcon imported for accessibility usage */}
+          <ImageIcon className="hidden" />
+        </div>
       )}
     </div>
   );
