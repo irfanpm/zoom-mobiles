@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import AdminLoginForm from './admin-login-form';
 
 export const metadata = { title: 'Admin Login — Zoom Mobiles' };
+export const dynamic = 'force-dynamic';
 
 export default async function AdminLoginPage({
   searchParams,
@@ -10,17 +11,26 @@ export default async function AdminLoginPage({
   searchParams: Promise<{ redirect?: string; error?: string }>;
 }) {
   const sp = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  if (user) {
-    const { data: admin } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (admin) redirect(sp.redirect ?? '/admin');
+  // Never crash the admin login on a network blip — show the form if Supabase
+  // is briefly unreachable.
+  let adminId: string | null = null;
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: admin } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+      adminId = admin?.id ?? null;
+    }
+  } catch {
+    adminId = null;
   }
+
+  if (adminId) redirect(sp.redirect ?? '/admin');
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-dark-900 px-4 py-12">

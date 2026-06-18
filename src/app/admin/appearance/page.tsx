@@ -24,7 +24,7 @@ export default async function AppearancePage() {
           Appearance
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Logo · company name · color theme · about page — super admin only
+          Logo · company name · about page — super admin only
         </p>
       </div>
       <AppearanceForm settings={settings as any} />

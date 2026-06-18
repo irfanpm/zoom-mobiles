@@ -16,6 +16,7 @@ export function toUIProduct(p: PublicProduct): Product {
     code: p.code,
     category: p.category_slug ?? 'uncategorized',
     brand: p.brand ?? '—',
+    brandSlug: p.brand_slug,
     description: p.description ?? '',
     image: p.image_url ?? undefined,
     box: p.box_qty,             // null if hidden

@@ -6,6 +6,8 @@ export interface Product {
   code: string;
   category: string;
   brand: string;
+  /** Brand slug — used for ?brand= deep-links from the home page. */
+  brandSlug?: string;
   description: string;
   image?: string;
   /** pcs per box — null if admin hid */

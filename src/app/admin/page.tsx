@@ -2,12 +2,10 @@ import Link from 'next/link';
 import {
   Package,
   Users,
-  MessageSquare,
+  Tag,
   FolderTree,
-  TrendingUp,
   PackageX,
   Plus,
-  ArrowRight,
 } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -23,7 +21,7 @@ export default async function AdminDashboard() {
   // Service-client reads (bypass RLS), so dashboard always shows real counts.
   const supabase = createServiceClient();
 
-  const [{ count: totalProducts }, { count: published }, { count: outOfStock }, { count: totalCategories }, { count: totalCustomers }, { count: activeCustomers }, { count: totalEnquiries }, { count: newEnquiries }, { data: recentEnquiries }] =
+  const [{ count: totalProducts }, { count: published }, { count: outOfStock }, { count: totalCategories }, { count: totalCustomers }, { count: activeCustomers }, { count: totalBrands }] =
     await Promise.all([
       supabase.from('products').select('*', { count: 'exact', head: true }),
       supabase.from('products').select('*', { count: 'exact', head: true }).eq('is_published', true),
@@ -31,9 +29,7 @@ export default async function AdminDashboard() {
       supabase.from('categories').select('*', { count: 'exact', head: true }),
       supabase.from('customers').select('*', { count: 'exact', head: true }),
       supabase.from('customers').select('*', { count: 'exact', head: true }).eq('is_active', true),
-      supabase.from('enquiries').select('*', { count: 'exact', head: true }),
-      supabase.from('enquiries').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-      supabase.from('enquiries').select('id, customer_snapshot, items, status, created_at').order('created_at', { ascending: false }).limit(5),
+      supabase.from('brands').select('*', { count: 'exact', head: true }),
     ]);
 
   const stats = [
@@ -54,20 +50,20 @@ export default async function AdminDashboard() {
       href: '/admin/categories',
     },
     {
+      label: 'Brands',
+      value: totalBrands ?? 0,
+      sub: 'active',
+      icon: Tag,
+      color: 'from-dark to-dark-700',
+      href: '/admin/brands',
+    },
+    {
       label: 'Customers',
       value: totalCustomers ?? 0,
       sub: `${activeCustomers ?? 0} active`,
       icon: Users,
       color: 'from-accent to-accent-600',
       href: '/admin/customers',
-    },
-    {
-      label: 'Enquiries',
-      value: totalEnquiries ?? 0,
-      sub: `${newEnquiries ?? 0} new`,
-      icon: MessageSquare,
-      color: 'from-dark to-dark-700',
-      href: '/admin/enquiries',
     },
   ];
 
@@ -129,62 +125,22 @@ export default async function AdminDashboard() {
         </div>
       )}
 
-      {/* Recent enquiries */}
-      <div className="rounded-2xl bg-white shadow-card border border-slate-200/60 overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <div>
-            <h2 className="font-semibold text-dark flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Recent Enquiries
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Latest 5 from customers</p>
-          </div>
-          <Link
-            href="/admin/enquiries"
-            className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
-          >
-            View all <ArrowRight className="h-3.5 w-3.5" />
+      {/* Quick actions */}
+      <div className="rounded-2xl bg-white shadow-card border border-slate-200/60 p-5">
+        <h2 className="font-semibold text-dark text-sm mb-3">Quick Actions</h2>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/products/new"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm text-dark hover:bg-slate-50 transition">
+            <Plus className="h-3.5 w-3.5" /> Add Product
           </Link>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {(recentEnquiries ?? []).length === 0 ? (
-            <div className="p-10 text-center text-sm text-slate-500">
-              No enquiries yet.
-            </div>
-          ) : (
-            (recentEnquiries ?? []).map((e: any) => (
-              <Link
-                key={e.id}
-                href={`/admin/enquiries#${e.id}`}
-                className="flex items-center justify-between gap-4 p-4 hover:bg-slate-50 transition"
-              >
-                <div className="min-w-0">
-                  <div className="font-medium text-dark text-sm truncate">
-                    {e.customer_snapshot?.full_name ?? 'Guest customer'}
-                    {e.customer_snapshot?.company_name && (
-                      <span className="text-slate-500"> · {e.customer_snapshot.company_name}</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {Array.isArray(e.items) ? e.items.length : 0} items · {new Date(e.created_at).toLocaleString()}
-                  </div>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                    e.status === 'new'
-                      ? 'bg-primary/10 text-primary'
-                      : e.status === 'contacted'
-                        ? 'bg-secondary/10 text-secondary'
-                        : e.status === 'converted'
-                          ? 'bg-success/10 text-success'
-                          : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {e.status}
-                </span>
-              </Link>
-            ))
-          )}
+          <Link href="/admin/customers"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm text-dark hover:bg-slate-50 transition">
+            <Users className="h-3.5 w-3.5" /> Manage Customers
+          </Link>
+          <Link href="/admin/products"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm text-dark hover:bg-slate-50 transition">
+            <Package className="h-3.5 w-3.5" /> View Catalog
+          </Link>
         </div>
       </div>
     </div>

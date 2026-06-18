@@ -175,6 +175,36 @@ export async function fetchVisibleBrands(): Promise<DbBrand[]> {
   return filtered as DbBrand[];
 }
 
+/** Active home-page banners (newest config). */
+export async function fetchBanners() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('banners')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
+  if (error) return []; // table may not exist yet (pre-migration) → no banners
+  return data ?? [];
+}
+
+/**
+ * Categories that have at least one product the current customer can see.
+ * Respects brand access: a category with only restricted-brand products is hidden.
+ */
+export async function fetchVisibleCategoriesWithCounts(): Promise<
+  Array<DbCategory & { product_count: number }>
+> {
+  const products = await fetchAllProducts(); // already brand-access filtered
+  const counts = new Map<string, number>();
+  products.forEach((p) => {
+    if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1);
+  });
+  const cats = await fetchAllCategories();
+  return cats
+    .map((c) => ({ ...c, product_count: counts.get(c.id) ?? 0 }))
+    .filter((c) => c.product_count > 0); // hide empty/inaccessible categories
+}
+
 // React `cache()` dedupes calls within a single render — if multiple
 // server components call fetchSettings(), only one Supabase round-trip happens.
 export const fetchSettings = cache(async function fetchSettings(): Promise<DbSettings> {

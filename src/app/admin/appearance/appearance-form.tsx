@@ -3,8 +3,8 @@
 import { useRef, useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ImageIcon, Palette, Type, FileText, Save, AlertCircle, CheckCircle2,
-  Upload, X, Loader2, RotateCcw,
+  ImageIcon, FileText, Save, AlertCircle, CheckCircle2,
+  Upload, X, Loader2,
 } from 'lucide-react';
 import { saveBranding, uploadLogo } from '@/lib/branding/actions';
 
@@ -12,28 +12,25 @@ type Settings = {
   company_name: string;
   tagline: string;
   logo_url: string | null;
-  theme_primary: string | null;
-  theme_secondary: string | null;
-  theme_accent: string | null;
   about_title: string | null;
   about_content: string | null;
 };
 
-const THEME_DEFAULTS = {
-  theme_primary: '#00C853',
-  theme_secondary: '#0066FF',
-  theme_accent: '#FFB800',
+// Current default content — used to pre-fill fields when nothing is saved yet,
+// so the admin sees the live values instead of empty boxes.
+const DEFAULTS = {
+  company_name: 'Zoom Mobiles',
+  tagline: 'A Complete Mobile Accessories Hub',
+  about_title: "India's most trusted mobile accessories wholesale platform.",
+  about_content:
+    'We supply 10,000+ retail mobile shops across India with original and compatible accessories — from power banks and TWS to chargers and replacement batteries. Every product, every brand, every model — all under one roof.',
 };
 
 export default function AppearanceForm({ settings }: { settings: Settings }) {
   const [logoUrl, setLogoUrl] = useState(settings.logo_url ?? '');
-  const [colors, setColors] = useState({
-    theme_primary: settings.theme_primary ?? THEME_DEFAULTS.theme_primary,
-    theme_secondary: settings.theme_secondary ?? THEME_DEFAULTS.theme_secondary,
-    theme_accent: settings.theme_accent ?? THEME_DEFAULTS.theme_accent,
-  });
   const [logoBusy, setLogoBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -55,18 +52,17 @@ export default function AppearanceForm({ settings }: { settings: Settings }) {
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setWarning(null);
     setSuccess(false);
     const fd = new FormData(e.currentTarget);
     fd.set('logo_url', logoUrl);
-    fd.set('theme_primary', colors.theme_primary);
-    fd.set('theme_secondary', colors.theme_secondary);
-    fd.set('theme_accent', colors.theme_accent);
     start(async () => {
       const res = await saveBranding(fd);
       if (res?.error) setError(res.error);
       else {
         setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+        if ('warning' in res && res.warning) setWarning(res.warning as string);
+        setTimeout(() => setSuccess(false), 4000);
       }
     });
   }
@@ -103,86 +99,60 @@ export default function AppearanceForm({ settings }: { settings: Settings }) {
           </div>
 
           <Field label="Company Name *">
-            <input name="company_name" required defaultValue={settings.company_name}
+            <input name="company_name" required
+              defaultValue={settings.company_name || DEFAULTS.company_name}
               className="input" suppressHydrationWarning />
           </Field>
           <Field label="Tagline">
-            <input name="tagline" defaultValue={settings.tagline}
-              placeholder="A Complete Mobile Accessories Hub" className="input" suppressHydrationWarning />
+            <input name="tagline"
+              defaultValue={settings.tagline || DEFAULTS.tagline}
+              className="input" suppressHydrationWarning />
           </Field>
-        </div>
-      </Card>
-
-      {/* COLOR THEME */}
-      <Card title="Color Theme" icon={Palette}>
-        <p className="text-xs text-slate-500 -mt-1 mb-4">
-          Changes the main brand colors across the whole site (buttons, badges, highlights).
-        </p>
-        <div className="space-y-4">
-          <ColorRow label="Primary (buttons, highlights)" value={colors.theme_primary}
-            onChange={(v) => setColors((c) => ({ ...c, theme_primary: v }))} />
-          <ColorRow label="Secondary (links, accents)" value={colors.theme_secondary}
-            onChange={(v) => setColors((c) => ({ ...c, theme_secondary: v }))} />
-          <ColorRow label="Accent (badges, highlights)" value={colors.theme_accent}
-            onChange={(v) => setColors((c) => ({ ...c, theme_accent: v }))} />
-
-          <button type="button"
-            onClick={() => setColors({ ...THEME_DEFAULTS })}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition">
-            <RotateCcw className="h-3 w-3" /> Reset to default colors
-          </button>
-
-          {/* live preview */}
-          <div className="rounded-xl border border-slate-200 p-4 space-y-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Preview</div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-xl px-4 py-2 text-xs font-semibold text-white"
-                style={{ background: colors.theme_primary }}>Primary Button</span>
-              <span className="rounded-xl px-4 py-2 text-xs font-semibold text-white"
-                style={{ background: colors.theme_secondary }}>Secondary</span>
-              <span className="rounded-xl px-4 py-2 text-xs font-semibold text-dark"
-                style={{ background: colors.theme_accent }}>Accent</span>
-            </div>
-          </div>
         </div>
       </Card>
 
       {/* ABOUT PAGE CONTENT */}
-      <Card title="About Page Content" icon={FileText} className="lg:col-span-2">
+      <Card title="About Page Content" icon={FileText}>
         <div className="space-y-4">
           <Field label="About Title">
             <input name="about_title"
-              defaultValue={settings.about_title ?? ''}
-              placeholder="India's most trusted mobile accessories wholesale platform."
+              defaultValue={settings.about_title || DEFAULTS.about_title}
               className="input" suppressHydrationWarning />
           </Field>
           <Field label="About Content">
             <textarea name="about_content" rows={6}
-              defaultValue={settings.about_content ?? ''}
-              placeholder="We supply 10,000+ retail mobile shops across India with original and compatible accessories…"
+              defaultValue={settings.about_content || DEFAULTS.about_content}
               className="input resize-y" suppressHydrationWarning />
           </Field>
         </div>
       </Card>
 
       {/* SAVE */}
-      <div className="lg:col-span-2 flex items-center gap-3">
-        <button type="submit" disabled={pending}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-glow hover:bg-primary-600 transition disabled:opacity-60">
-          <Save className="h-4 w-4" />
-          {pending ? 'Saving…' : 'Save Appearance'}
-        </button>
-        {error && (
-          <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2 rounded-xl bg-danger/5 border border-danger/20 px-3 py-2.5 text-sm text-danger">
-            <AlertCircle className="h-4 w-4" /><span>{error}</span>
-          </motion.div>
-        )}
-        {success && (
-          <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2 rounded-xl bg-success/5 border border-success/20 px-3 py-2.5 text-sm text-success">
-            <CheckCircle2 className="h-4 w-4" /><span>Saved! Refresh customer pages to see changes.</span>
-          </motion.div>
+      <div className="lg:col-span-2 space-y-3">
+        <div className="flex items-center gap-3">
+          <button type="submit" disabled={pending}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-glow hover:bg-primary-600 transition disabled:opacity-60">
+            <Save className="h-4 w-4" />
+            {pending ? 'Saving…' : 'Save Appearance'}
+          </button>
+          {error && (
+            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 rounded-xl bg-danger/5 border border-danger/20 px-3 py-2.5 text-sm text-danger">
+              <AlertCircle className="h-4 w-4" /><span>{error}</span>
+            </motion.div>
+          )}
+          {success && (
+            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 rounded-xl bg-success/5 border border-success/20 px-3 py-2.5 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /><span>Saved! Refresh customer pages to see changes.</span>
+            </motion.div>
+          )}
+        </div>
+        {warning && (
+          <div className="flex items-start gap-2 rounded-xl bg-warning/5 border border-warning/30 px-3 py-2.5 text-sm text-warning-700">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
+            <span className="text-dark-700">{warning}</span>
+          </div>
         )}
       </div>
 
@@ -197,22 +167,6 @@ export default function AppearanceForm({ settings }: { settings: Settings }) {
         }
       `}</style>
     </form>
-  );
-}
-
-function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex items-center gap-3">
-      <input type="color" value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-14 rounded-lg border border-slate-200 cursor-pointer bg-white p-1" />
-      <div className="flex-1">
-        <div className="text-xs font-medium text-dark-700">{label}</div>
-        <input type="text" value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="mt-0.5 w-28 rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono outline-none focus:border-primary"
-          suppressHydrationWarning />
-      </div>
-    </div>
   );
 }
 

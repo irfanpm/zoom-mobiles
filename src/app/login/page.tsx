@@ -11,14 +11,27 @@ export default async function LoginPage({
   searchParams: Promise<{ redirect?: string }>;
 }) {
   const sp = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  // Resolve session, but never crash the login page on a network blip —
+  // if Supabase is briefly unreachable, just show the login form.
+  let user = null;
+  let adminId: string | null = null;
+  try {
+    const supabase = await createClient();
+    const res = await supabase.auth.getUser();
+    user = res.data.user;
+    if (user) {
+      const { data: admin } = await supabase
+        .from('admin_users').select('id').eq('id', user.id).maybeSingle();
+      adminId = admin?.id ?? null;
+    }
+  } catch {
+    user = null; // network/offline → render the login form
+  }
 
   // If already logged in, route them to the right place
   if (user) {
-    const { data: admin } = await supabase
-      .from('admin_users').select('id').eq('id', user.id).maybeSingle();
-    if (admin) redirect('/admin');
+    if (adminId) redirect('/admin');
     redirect(sp.redirect ?? '/products');
   }
 

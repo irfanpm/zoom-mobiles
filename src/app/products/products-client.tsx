@@ -56,7 +56,13 @@ export default function ProductsClient({
     const params = new URLSearchParams(window.location.search);
     const cat = params.get('cat');
     if (cat) setCategory(cat);
-  }, []);
+    // Brand deep-link from home page: ?brand=<slug> → resolve to brand name
+    const brandSlug = params.get('brand');
+    if (brandSlug) {
+      const match = ALL.find((p) => p.brandSlug === brandSlug);
+      if (match) setBrand(match.brand);
+    }
+  }, [ALL]);
 
   const brands = useMemo(
     () => Array.from(new Set(ALL.map((p) => p.brand))).filter((b) => b !== '—').sort(),

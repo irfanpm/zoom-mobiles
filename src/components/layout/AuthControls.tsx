@@ -30,20 +30,26 @@ export default function AuthControls({ className = '' }: { className?: string })
   useEffect(() => {
     const supabase = createClient();
     let cancel = false;
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user || cancel) {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancel) {
+          if (!cancel) setLoaded(true);
+          return;
+        }
+        const { data } = await supabase
+          .from('customers')
+          .select('full_name, company_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (cancel) return;
+        if (data) setMe({ name: data.full_name, company: data.company_name });
         setLoaded(true);
-        return;
+      } catch {
+        // Network blip / offline — fail quietly, just show the logged-out state.
+        if (!cancel) setLoaded(true);
       }
-      const { data } = await supabase
-        .from('customers')
-        .select('full_name, company_name')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (cancel) return;
-      if (data) setMe({ name: data.full_name, company: data.company_name });
-      setLoaded(true);
-    });
+    })();
     return () => {
       cancel = true;
     };
