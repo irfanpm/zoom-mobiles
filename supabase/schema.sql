@@ -24,7 +24,7 @@ create index if not exists categories_sort_idx on public.categories(sort_order);
 -- ── 2. PRODUCTS ───────────────────────────────────────────────────
 create table if not exists public.products (
   id              uuid primary key default gen_random_uuid(),
-  code            text unique not null,
+  code            text not null,            -- NOT unique: same code may repeat across products
   name            text not null,
   description     text,
   category_id     uuid references public.categories(id) on delete set null,

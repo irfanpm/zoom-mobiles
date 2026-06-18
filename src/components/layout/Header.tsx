@@ -13,6 +13,7 @@ import { useSettings } from '@/components/providers/SettingsProvider';
 import AuthControls from './AuthControls';
 
 const NAV = [
+  { label: 'Home', href: '/' },
   { label: 'Catalog', href: '/products' },
   { label: 'About', href: '/about' },
 ];
