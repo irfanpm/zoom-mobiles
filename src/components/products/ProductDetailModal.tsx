@@ -26,6 +26,7 @@ import { quickEnquiryUrl } from '@/lib/whatsapp';
 import { useEnquiryStore } from '@/store/enquiry-store';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { logEnquiry } from '@/lib/enquiries/actions';
+import { openExternal } from '@/lib/open-url';
 import { useTransition } from 'react';
 import { Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -57,12 +58,8 @@ export function ProductDetailModal({ product, open, onOpenChange }: ProductDetai
     }
     const url = quickEnquiryUrl(product.name, product.code, settings);
 
-    // Open WhatsApp synchronously (avoids popup blocker)
-    const popup = window.open(url, '_blank', 'noopener');
-    if (!popup) {
-      toast.error('Pop-up blocked — please allow popups for this site');
-      return;
-    }
+    // Open WhatsApp via anchor click (popup-blocker resistant)
+    openExternal(url);
 
     // Log to admin panel in background
     startWa(async () => {

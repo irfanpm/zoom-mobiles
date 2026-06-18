@@ -99,6 +99,29 @@ export async function requestPasswordReset(formData: FormData) {
 // because the recovery session from the email link lives in the browser
 // (URL code/hash) — the server has no access to it.
 
+// ── CHANGE OWN PASSWORD (logged-in admin) ─────────────────────────
+export async function changeOwnPassword(formData: FormData) {
+  const newPassword = String(formData.get('new_password') ?? '');
+  const confirm = String(formData.get('confirm') ?? '');
+
+  if (newPassword.length < 6) return { error: 'Password must be at least 6 characters.' };
+  if (newPassword !== confirm) return { error: 'Passwords do not match.' };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated. Please log in again.' };
+
+  // Must be an admin (this action is only exposed in the admin header)
+  const { data: admin } = await supabase
+    .from('admin_users').select('id').eq('id', user.id).maybeSingle();
+  if (!admin) return { error: 'Admin access required.' };
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) return { error: error.message };
+
+  return { success: true };
+}
+
 // ── LOGOUT ────────────────────────────────────────────────────────
 export async function logout() {
   const supabase = await createClient();

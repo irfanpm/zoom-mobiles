@@ -53,15 +53,19 @@ export async function createAdmin(formData: FormData) {
       created_by: me.id,
     };
 
-    // Retry without any columns the schema doesn't have yet (pre-migration safety).
+    // Retry dropping ONLY the specific missing column each time (pre-migration
+    // safety) — never strip email/phone unless they're truly the missing column.
     let rowErr = (await svc.from('admin_users').insert(baseRow)).error;
-    if (rowErr) {
-      const missing = /column "?([a-z_]+)"? .*does not exist|Could not find the '([a-z_]+)'/i.exec(rowErr.message);
-      if (missing) {
-        for (const col of ['whatsapp_number', 'whatsapp_display', 'created_by', 'phone', 'email']) {
-          delete baseRow[col];
-        }
+    let guard = 0;
+    while (rowErr && guard < 8) {
+      const m = /'?([a-z_]+)'? column|column "?([a-z_]+)"?/i.exec(rowErr.message);
+      const col = m?.[1] || m?.[2];
+      if (col && col in baseRow) {
+        delete baseRow[col];
         rowErr = (await svc.from('admin_users').insert(baseRow)).error;
+        guard++;
+      } else {
+        break;
       }
     }
     if (rowErr) {

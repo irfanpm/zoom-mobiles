@@ -10,6 +10,7 @@ import { buildWhatsAppMessage } from '@/lib/whatsapp';
 import { useSettings, whatsappUrl } from '@/components/providers/SettingsProvider';
 import { cn } from '@/lib/utils';
 import { logEnquiry } from '@/lib/enquiries/actions';
+import { openExternal as openWhatsApp } from '@/lib/open-url';
 import { toast } from 'sonner';
 import type { DbEnquiryItem } from '@/lib/supabase/types';
 
@@ -45,38 +46,21 @@ export function FloatingEnquiryBar() {
     const msg = buildWhatsAppMessage({ items, settings });
     const url = whatsappUrl(settings.whatsapp_number, msg);
 
-    // ── Open WhatsApp SYNCHRONOUSLY inside the user-click handler ──
-    // Browsers block window.open() that fires later inside an async callback.
-    // Doing it now (directly in the click) bypasses the popup blocker.
-    const popup = window.open(url, '_blank', 'noopener');
-    if (!popup) {
-      toast.error('Pop-up blocked', {
-        description: `Please allow popups, or open ${settings.whatsapp_display} manually.`,
-      });
-      return;
-    }
+    // ── Open WhatsApp via an anchor click — most popup-blocker-resistant.
+    // Falls back to same-tab navigation if even that is blocked.
+    openWhatsApp(url);
 
-    // ── Log to DB in background (won't block the customer) ──
+    // ── Enquiry is sent → clear the cart immediately (and wipe persisted copy)
+    clear();
+    try { localStorage.removeItem('zoom-mobiles-enquiry'); } catch { /* ignore */ }
+    toast.success('✅ Enquiry sent on WhatsApp');
+
+    // ── Log to DB in the background (doesn't affect the cart) ──
     start(async () => {
       const res = await logEnquiry(dbItems);
-      if (!res) {
-        toast.error('Unknown error logging enquiry');
-        return;
+      if (res && 'error' in res && res.error) {
+        console.error('[enquiry] log failed:', res.error);
       }
-      if ('error' in res && res.error) {
-        toast.error('Enquiry not saved to admin', { description: res.error });
-        return;
-      }
-      if ('skipped' in res && res.skipped) {
-        toast.warning('WhatsApp opened, but enquiry NOT logged', {
-          description:
-            'You are logged in as admin — enquiry logging requires a customer account.',
-          duration: 6000,
-        });
-        return;
-      }
-      toast.success('✅ Enquiry sent & saved to admin panel');
-      clear(); // empty the cart so user sees a clean slate
     });
   };
 

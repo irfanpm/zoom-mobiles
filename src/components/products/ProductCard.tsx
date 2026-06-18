@@ -10,6 +10,7 @@ import { useEnquiryStore } from '@/store/enquiry-store';
 import { quickEnquiryUrl } from '@/lib/whatsapp';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { logEnquiry } from '@/lib/enquiries/actions';
+import { openExternal } from '@/lib/open-url';
 import { toast } from 'sonner';
 import type { Product } from '@/types';
 
@@ -31,12 +32,8 @@ export function ProductCard({ product, onView, variant = 'default' }: ProductCar
   const handleQuickWhatsApp = () => {
     const url = quickEnquiryUrl(product.name, product.code, settings);
 
-    // Open WhatsApp synchronously (avoids popup blocker)
-    const popup = window.open(url, '_blank', 'noopener');
-    if (!popup) {
-      toast.error('Pop-up blocked — please allow popups for this site');
-      return;
-    }
+    // Open WhatsApp via anchor click (popup-blocker resistant)
+    openExternal(url);
 
     // Log to admin panel in background
     startWa(async () => {

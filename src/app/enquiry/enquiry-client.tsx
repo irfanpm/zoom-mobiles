@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { useEnquiryStore } from '@/store/enquiry-store';
 import { logEnquiry } from '@/lib/enquiries/actions';
 import { buildWhatsAppMessage } from '@/lib/whatsapp';
+import { openExternal } from '@/lib/open-url';
 import { cn } from '@/lib/utils';
 import type { DbEnquiryItem } from '@/lib/supabase/types';
 
@@ -101,26 +102,20 @@ export default function EnquiryClient({
       unit: it.unit === 'piece' ? 'pcs' : 'box',
     }));
 
-    // Open WhatsApp synchronously inside the click handler (no popup blocker)
-    const popup = window.open(whatsappUrl, '_blank', 'noopener');
-    if (!popup) {
-      alert('Pop-up blocked. Please allow popups and try again.');
-      return;
-    }
+    // Open WhatsApp via anchor click (popup-blocker resistant)
+    openExternal(whatsappUrl);
 
+    // Enquiry is sent → clear the cart immediately + wipe the persisted copy
+    setSent(true);
+    clear();
+    try { localStorage.removeItem('zoom-mobiles-enquiry'); } catch { /* ignore */ }
+
+    // Log to DB in the background (doesn't affect the cart)
     start(async () => {
       const res = await logEnquiry(dbItems, values.notes);
       if (res && 'error' in res && res.error) {
-        // surface error but don't undo the open WhatsApp window
-        alert('WhatsApp opened, but enquiry could not be saved to admin: ' + res.error);
-        return;
+        console.error('[enquiry] log failed:', res.error);
       }
-      if (res && 'skipped' in res && res.skipped) {
-        alert('You are logged in as admin — enquiry NOT saved to /admin/enquiries. Log in as a customer to log enquiries.');
-        return;
-      }
-      setSent(true);
-      clear(); // empty the cart so user sees fresh state
     });
   };
 
