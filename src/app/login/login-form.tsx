@@ -94,6 +94,15 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
           </motion.div>
         )}
 
+        <div className="text-right -mb-1">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
         <button
           type="submit"
           disabled={pending}

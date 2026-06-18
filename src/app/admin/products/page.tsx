@@ -4,28 +4,37 @@ import { Plus, Search, Filter, Package } from 'lucide-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 import ProductsTable from './products-table';
+import Pagination from '@/components/admin/Pagination';
 
 export const metadata = { title: 'Products — Admin' };
 export const dynamic = 'force-dynamic';
 
+const PAGE_SIZE = 25;
+
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; brand?: string; stock?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; brand?: string; stock?: string; page?: string }>;
 }) {
   const sp = await searchParams;
   const me = await getCurrentAdmin();
   if (!me) redirect('/admin/login');
   const supabase = createServiceClient();
 
+  const page = Math.max(1, Number(sp.page) || 1);
+  const fromRow = (page - 1) * PAGE_SIZE;
+  const toRow = fromRow + PAGE_SIZE - 1;
+
+  // `count: 'exact'` returns the total matching rows for pagination math.
   let query = supabase
     .from('products')
     .select(
       'id, code, name, image_url, wholesale_price, stock_qty, stock_status, is_published, show_price, category_id, brand_id, sort_order, categories(name, slug), brands(name, slug)',
+      { count: 'exact' },
     )
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
-    .limit(500);
+    .range(fromRow, toRow);
 
   if (sp.q) query = query.or(`code.ilike.%${sp.q}%,name.ilike.%${sp.q}%`);
   if (sp.category) query = query.eq('category_id', sp.category);
@@ -33,11 +42,13 @@ export default async function AdminProductsPage({
   else if (sp.brand) query = query.eq('brand_id', sp.brand);
   if (sp.stock) query = query.eq('stock_status', sp.stock);
 
-  const [{ data: products }, { data: categories }, { data: brands }] = await Promise.all([
+  const [{ data: products, count }, { data: categories }, { data: brands }] = await Promise.all([
     query,
     supabase.from('categories').select('id, name').order('sort_order'),
     supabase.from('brands').select('id, name').order('sort_order'),
   ]);
+
+  const total = count ?? 0;
 
   return (
     <div className="space-y-6">
@@ -48,7 +59,7 @@ export default async function AdminProductsPage({
             Products
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            {products?.length ?? 0} products · Manage your full catalog
+            {total} products · Manage your full catalog
           </p>
         </div>
         <Link
@@ -110,6 +121,14 @@ export default async function AdminProductsPage({
       </form>
 
       <ProductsTable products={(products ?? []) as any} />
+
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        basePath="/admin/products"
+        params={{ q: sp.q, category: sp.category, brand: sp.brand, stock: sp.stock }}
+      />
     </div>
   );
 }

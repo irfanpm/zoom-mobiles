@@ -1,33 +1,53 @@
 import { redirect } from 'next/navigation';
-import { Users } from 'lucide-react';
+import { Users, Search } from 'lucide-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getCurrentAdmin } from '@/lib/auth/admin-guard';
 import CustomersManager from './customers-manager';
+import Pagination from '@/components/admin/Pagination';
 
 export const metadata = { title: 'Customers — Admin' };
 export const dynamic = 'force-dynamic';
 
-export default async function AdminCustomersPage() {
+const PAGE_SIZE = 25;
+
+export default async function AdminCustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
+  const sp = await searchParams;
   const me = await getCurrentAdmin();
   if (!me) redirect('/admin/login');
 
-  // Read via service client (bypasses RLS), then scope by ownership in code:
-  //  • super_admin → sees ALL customers
-  //  • sub-admin   → sees ONLY customers where created_by = themselves.
-  //    This covers both: customers the sub-admin added, AND customers the
-  //    super admin assigned to them (assignment sets created_by = that admin).
+  const page = Math.max(1, Number(sp.page) || 1);
+  const fromRow = (page - 1) * PAGE_SIZE;
+  const toRow = fromRow + PAGE_SIZE - 1;
+
+  // Read via service client (bypasses RLS), scope by ownership in code:
+  //  • super_admin → ALL customers
+  //  • sub-admin   → only customers where created_by = themselves
   const svc = createServiceClient();
 
-  let customersQuery = svc.from('customers').select('*').order('created_at', { ascending: false });
+  let customersQuery = svc
+    .from('customers')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(fromRow, toRow);
+
   if (me.role !== 'super_admin') {
     customersQuery = customersQuery.eq('created_by', me.id);
   }
+  if (sp.q) {
+    customersQuery = customersQuery.or(
+      `full_name.ilike.%${sp.q}%,email.ilike.%${sp.q}%,company_name.ilike.%${sp.q}%,phone.ilike.%${sp.q}%`,
+    );
+  }
 
   const [
-    { data: customers },
+    { data: customers, count: scopedCount },
     { data: brands },
     { data: access },
-    { count: totalCount },
+    { count: totalAll },
     { data: admins },
   ] = await Promise.all([
     customersQuery,
@@ -37,13 +57,13 @@ export default async function AdminCustomersPage() {
     svc.from('admin_users').select('id, full_name, role').order('created_at'),
   ]);
 
-  // Map admin id → name for the "Added By" column (super admin view)
   const ownerNames: Record<string, string> = {};
   (admins ?? []).forEach((a: any) => { ownerNames[a.id] = a.full_name; });
 
-  const shown = customers?.length ?? 0;
-  const total = totalCount ?? 0;
-  const hiddenByScope = me.role !== 'super_admin' && total > shown;
+  const total = scopedCount ?? 0;            // total in this admin's scope (for pagination)
+  const totalEverywhere = totalAll ?? 0;     // all customers in the system
+  const hiddenByScope =
+    me.role !== 'super_admin' && !sp.q && totalEverywhere > total;
 
   return (
     <div className="space-y-6">
@@ -53,14 +73,34 @@ export default async function AdminCustomersPage() {
           Customers
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          {shown} customers · only people you add here can log in
+          {total} customers · only people you add here can log in
           {hiddenByScope && (
             <span className="text-slate-400">
-              {' '}· {total - shown} owned by other admins (hidden)
+              {' '}· {totalEverywhere - total} owned by other admins (hidden)
             </span>
           )}
         </p>
       </div>
+
+      {/* Search */}
+      <form className="flex items-center gap-2 rounded-2xl bg-white border border-slate-200 p-3 shadow-card">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            name="q"
+            defaultValue={sp.q ?? ''}
+            placeholder="Search by name, company, email or phone…"
+            className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <button
+          type="submit"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-dark px-4 py-2 text-sm font-medium text-white hover:bg-dark-700 transition"
+        >
+          <Search className="h-3.5 w-3.5" /> Search
+        </button>
+      </form>
+
       <CustomersManager
         customers={(customers ?? []) as any}
         brands={(brands ?? []) as any}
@@ -68,6 +108,14 @@ export default async function AdminCustomersPage() {
         ownerNames={ownerNames}
         showOwner={me.role === 'super_admin'}
         admins={(admins ?? []) as any}
+      />
+
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        basePath="/admin/customers"
+        params={{ q: sp.q }}
       />
     </div>
   );

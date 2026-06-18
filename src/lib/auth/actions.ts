@@ -78,6 +78,27 @@ export async function loginAdmin(formData: FormData) {
   redirect(redirectTo);
 }
 
+// ── FORGOT PASSWORD: send reset email ─────────────────────────────
+export async function requestPasswordReset(formData: FormData) {
+  const email = String(formData.get('email') ?? '').trim().toLowerCase();
+  if (!email) return { error: 'Please enter your email.' };
+
+  const supabase = await createClient();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+  // Supabase sends a magic reset link to the email if an account exists.
+  // We always return success (don't reveal whether an email is registered).
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/reset-password`,
+  });
+
+  return { success: true };
+}
+
+// NOTE: setting the new password happens CLIENT-SIDE in /reset-password,
+// because the recovery session from the email link lives in the browser
+// (URL code/hash) — the server has no access to it.
+
 // ── LOGOUT ────────────────────────────────────────────────────────
 export async function logout() {
   const supabase = await createClient();
