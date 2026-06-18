@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import * as Icons from 'lucide-react';
 import {
-  ArrowRight, ChevronLeft, ChevronRight, Package, Tag, Sparkles, MessageCircle,
+  ArrowRight, ChevronLeft, ChevronRight, Tag, Sparkles, MessageCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -57,34 +56,6 @@ export default function HomeClient({
       {banners.length > 0 && (
         <section className="container-fluid mt-6">
           <BannerCarousel banners={banners} />
-        </section>
-      )}
-
-      {/* Categories */}
-      {categories.length > 0 && (
-        <section className="container-fluid mt-10">
-          <SectionHead icon={Package} title="Shop by Category" subtitle="Tap a category to view products" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
-            {categories.map((c, i) => {
-              const Icon = ((Icons as unknown as Record<string, LucideIcon>)[c.icon ?? 'Package'] ?? Package);
-              return (
-                <motion.div key={c.id}
-                  initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }} transition={{ delay: i * 0.03 }}>
-                  <Link href={`/categories/${c.slug}`}
-                    className="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-dark-200/70 bg-white p-5 text-center shadow-card hover:shadow-premium hover:border-primary/30 transition">
-                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 text-primary group-hover:scale-110 transition">
-                      <Icon className="h-7 w-7" />
-                    </span>
-                    <div>
-                      <div className="font-semibold text-dark-900 text-sm">{c.name}</div>
-                      <div className="text-[11px] text-dark-500">{c.product_count} products</div>
-                    </div>
-                  </Link>
-                </motion.div>
-              );
-            })}
-          </div>
         </section>
       )}
 
