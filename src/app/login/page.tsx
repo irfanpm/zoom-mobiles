@@ -32,13 +32,13 @@ export default async function LoginPage({
   // If already logged in, route them to the right place
   if (user) {
     if (adminId) redirect('/admin');
-    redirect(sp.redirect ?? '/products');
+    redirect(sp.redirect ?? '/');
   }
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-mesh-primary px-4 py-12">
       <div className="absolute inset-0 -z-10 bg-grid-slate [background-size:32px_32px] opacity-50" />
-      <LoginForm redirectTo={sp.redirect ?? '/products'} />
+      <LoginForm redirectTo={sp.redirect ?? '/'} />
     </div>
   );
 }

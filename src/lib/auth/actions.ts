@@ -8,7 +8,8 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 export async function loginCustomer(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const password = String(formData.get('password') ?? '');
-  const redirectTo = String(formData.get('redirect') ?? '/products');
+  // Default landing after login = home page ('/').
+  const redirectTo = String(formData.get('redirect') ?? '/');
 
   if (!email || !password) {
     return { error: 'Please enter email and password.' };
