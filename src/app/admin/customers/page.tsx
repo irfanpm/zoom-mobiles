@@ -38,8 +38,9 @@ export default async function AdminCustomersPage({
     customersQuery = customersQuery.eq('created_by', me.id);
   }
   if (sp.q) {
+    const term = sp.q.replace(/[-\s]+/g, '%');
     customersQuery = customersQuery.or(
-      `full_name.ilike.%${sp.q}%,email.ilike.%${sp.q}%,company_name.ilike.%${sp.q}%,phone.ilike.%${sp.q}%`,
+      `full_name.ilike.%${term}%,email.ilike.%${term}%,company_name.ilike.%${term}%,phone.ilike.%${term}%`,
     );
   }
 

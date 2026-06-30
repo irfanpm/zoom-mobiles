@@ -36,7 +36,10 @@ export default async function AdminProductsPage({
     .order('created_at', { ascending: false })
     .range(fromRow, toRow);
 
-  if (sp.q) query = query.or(`code.ilike.%${sp.q}%,name.ilike.%${sp.q}%`);
+  if (sp.q) {
+    const term = sp.q.replace(/[-\s]+/g, '%');
+    query = query.or(`code.ilike.%${term}%,name.ilike.%${term}%`);
+  }
   if (sp.category) query = query.eq('category_id', sp.category);
   if (sp.brand === '__none__') query = query.is('brand_id', null);
   else if (sp.brand) query = query.eq('brand_id', sp.brand);

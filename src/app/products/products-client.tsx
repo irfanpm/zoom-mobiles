@@ -70,18 +70,38 @@ export default function ProductsClient({
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const qRaw = query.trim().toLowerCase();
+    const searchTerms = qRaw.split(/[-\s]+/).filter(Boolean);
+    
+    // Build a regex for each term to allow optional spaces/hyphens between characters,
+    // but enforce that the match starts at a word boundary.
+    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const termRegexes = searchTerms.map((term) => {
+      const chars = term.split('');
+      const regexStr = '(?:^|[-\\s])' + chars.map((c) => escapeRegExp(c)).join('[-\\s]*');
+      return new RegExp(regexStr, 'i');
+    });
+
     let list = ALL.filter((p) => {
       if (category !== 'all' && p.category !== category) return false;
       if (status !== 'all' && p.status !== status) return false;
       if (brand && p.brand !== brand) return false;
-      if (!q) return true;
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.code.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
-      );
+      if (searchTerms.length === 0) return true;
+      
+      const searchTarget = [
+        p.name,
+        p.code,
+        p.brand,
+        p.description,
+        p.moq ? `moq ${p.moq}` : '',
+        `${p.brand}${p.name}`,
+        `${p.brand}${p.code}`,
+        `${p.code}${p.brand}`,
+        `${p.name}${p.code}`,
+        p.moq ? `${p.brand}moq${p.moq}` : ''
+      ].join(' ').toLowerCase();
+      
+      return termRegexes.every((regex) => regex.test(searchTarget));
     });
     list = [...list].sort((a, b) => {
       switch (sort) {
